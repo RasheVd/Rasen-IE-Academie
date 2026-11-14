@@ -1,0 +1,37 @@
+# Diagnosa hosting academie.my.id dari luar: DNS, HTTPS, sertifikat, isi halaman, dan koneksi FTPS.
+# Jalankan manual: Actions → Diagnosa hosting → Run workflow. Tidak pernah mencetak kata sandi.
+name: Diagnosa hosting
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+    steps:
+      - name: DNS
+        run: |
+          dig +short academie.my.id A
+          dig +short www.academie.my.id A
+      - name: HTTP dan HTTPS
+        run: |
+          for u in http://academie.my.id/ https://academie.my.id/ https://academie.my.id/beranda https://www.academie.my.id/ https://academie.my.id/assets/; do
+            echo "--- $u"
+            curl -sS -o /tmp/body -D - --max-time 20 "$u" | grep -iE '^(HTTP|location|server|content-type|cache-control|x-frame)' || true
+            head -c 300 /tmp/body | tr '\n' ' '; echo
+          done
+      - name: Sertifikat SSL
+        run: |
+          echo | openssl s_client -connect academie.my.id:443 -servername academie.my.id 2>/dev/null | openssl x509 -noout -subject -issuer -dates -ext subjectAltName || echo "Tidak ada sertifikat yang valid"
+      - name: FTPS (tanpa login)
+        run: |
+          curl -sS --max-time 20 --ssl-reqd -v ftp://toscana.id.rapidplex.com/ 2>&1 | grep -E '^(<|\* (SSL|TLS|Connected|Server certificate|subject|issuer))' | head -20 || true
+      - name: Secret FTP_PASSWORD
+        run: |
+          if [ -n "$FTP_PASSWORD" ]; then echo "FTP_PASSWORD: ada"; else echo "FTP_PASSWORD: belum diisi"; fi
+      - name: Isi public_html (bila secret ada)
+        if: env.FTP_PASSWORD != ''
+        run: |
+          curl -sS --max-time 30 --ssl-reqd --user "academie:${FTP_PASSWORD}" -l ftp://toscana.id.rapidplex.com/public_html/ || echo "Login FTP gagal"
