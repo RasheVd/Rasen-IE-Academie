@@ -4,7 +4,7 @@
  * Aturan bisnis (batas waktu, kapasitas, bentrok, kredit) dijaga di database.
  */
 import { useSyncExternalStore } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type EmailOtpType } from '@supabase/supabase-js';
 import {
   defaultSettings, emptyData, type AvailabilityException, type BookingOptions, type Course, type Data, type Enrollment, type Material,
   type Mode, type Payout, type Profile, type Role, type Rule, type Session, type Settings, type Topic,
@@ -129,10 +129,23 @@ export async function load(silent = false) {
 }
 export const reload = () => load(true);
 
+const verifying = new Map<string, Promise<void>>();
 export const auth = {
   async signIn(email: string, password: string) { ok(await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })); },
   async forgot(email: string) { ok(await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: SITE + '/undangan' })); },
   async setPassword(password: string) { ok(await sb.auth.updateUser({ password })); set({ recovery: false }); },
+  /** Tautan undangan/atur ulang dari admin: ?token_hash=…&type=invite|recovery. Satu token hanya diverifikasi sekali. */
+  async verifyLink(tokenHash: string, type: string) {
+    if (!verifying.has(tokenHash)) {
+      const t = (['invite', 'recovery', 'magiclink', 'signup', 'email'].includes(type) ? type : 'invite') as EmailOtpType;
+      verifying.set(tokenHash, sb.auth.verifyOtp({ token_hash: tokenHash, type: t }).then((r) => { ok(r); }));
+    }
+    try { await verifying.get(tokenHash); }
+    catch (e) {
+      const m = (e as Error).message;
+      throw new AppError(/expired|invalid|not found/i.test(m) ? 'Tautan sudah dipakai atau kedaluwarsa.' : m);
+    }
+  },
   async signOut() { await sb.auth.signOut(); },
 };
 

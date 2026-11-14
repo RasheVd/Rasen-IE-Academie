@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Logo } from '../../components/Icon';
 import { Field } from '../../components/ui';
@@ -70,13 +70,25 @@ export function SetPassword() {
   const [err, setErr] = useState('');
   // Galat dari Supabase di URL (mis. tautan kedaluwarsa).
   const hashErr = new URLSearchParams(location.hash.slice(1)).get('error_description') || new URLSearchParams(location.search).get('error_description');
+  // Tautan dari admin (WhatsApp) membawa token_hash; verifikasi di sini, tanpa bergantung pada Redirect URLs Supabase.
+  // Dibaca sekali saat halaman dibuka: alamat dibersihkan setelah verifikasi, jadi jangan dibaca ulang tiap render.
+  const [link] = useState(() => { const q = new URLSearchParams(location.search); return { hash: q.get('token_hash'), type: q.get('type') ?? 'invite' }; });
+  const [verifying, setVerifying] = useState(!!link.hash);
+  const [otpErr, setOtpErr] = useState('');
+  useEffect(() => {
+    if (!link.hash) return;
+    auth.verifyLink(link.hash, link.type)
+      .then(async () => { history.replaceState(null, '', '/undangan'); await load(); })
+      .catch((x) => setOtpErr((x as Error).message))
+      .finally(() => setVerifying(false));
+  }, [link]);
 
-  if (status === 'booting' || status === 'loading') return <Loading label="Memeriksa tautan…" />;
-  if (status === 'signed-out' || status === 'error') return (
+  if (verifying || status === 'booting' || status === 'loading') return <Loading label="Memeriksa tautan…" />;
+  if (otpErr || status === 'signed-out' || status === 'error') return (
     <div className="auth"><div className="auth-card">
       <Brand />
       <h1 className="h-section">Tautan tidak berlaku</h1>
-      <p className="muted">{hashErr ? `${hashErr}. ` : ''}Tautan undangan hanya bisa dipakai sekali dan punya batas waktu. Minta admin mengirim ulang, atau pakai "Lupa kata sandi" di halaman masuk.</p>
+      <p className="muted">{hashErr || otpErr ? `${hashErr || otpErr} ` : ''}Tautan undangan hanya bisa dipakai sekali dan punya batas waktu. Minta admin mengirim ulang, atau pakai "Lupa kata sandi" di halaman masuk.</p>
       <Link className="btn primary" to="/masuk">Ke halaman masuk</Link>
       <WaButton phone={info.admin_whatsapp} text="Halo admin IE.Academie, tautan undangan saya tidak berlaku. Mohon dikirim ulang." label={`Minta tautan baru ke ${info.admin_whatsapp_label}`} block />
     </div></div>

@@ -73,7 +73,13 @@ Tanpa ini, tautan undangan dan atur ulang kata sandi membuka alamat yang salah.
 2. Isi SMTP Supabase: host `mail.academie.my.id`, port `465`, username `no-reply@academie.my.id`, kata sandi mailbox, sender name `IE.Academie`.
 3. Templat **Invite user** (opsional, bahasa Indonesia): "Kamu diundang ke IE.Academie. Klik tautan ini untuk membuat kata sandi: {{ .ConfirmationURL }}".
 
-Selama SMTP belum siap, tombol **Tautan WA** di halaman Peserta/Mentor membuat tautan undangan sekali pakai untuk dikirim lewat WhatsApp.
+Selama SMTP belum siap, tombol **Tautan WA** di halaman Peserta/Mentor membuat tautan undangan sekali pakai untuk dikirim lewat WhatsApp. Tautan itu berbentuk `https://academie.my.id/undangan?token_hash=…&type=invite` dan diverifikasi oleh halaman `/undangan` sendiri, jadi tetap bekerja walau Site URL belum diatur.
+
+**Authentication → Emails → Templates** (disarankan, supaya tautan email memakai jalur yang sama):
+- Invite user: tautan `{{ .SiteURL }}/undangan?token_hash={{ .TokenHash }}&type=invite`
+- Reset password: tautan `{{ .SiteURL }}/undangan?token_hash={{ .TokenHash }}&type=recovery`
+
+**Authentication → Sign In / Providers → Email:** matikan "Allow new users to sign up". Akun hanya dibuat lewat undangan admin; undangan tetap berjalan.
 
 ## Google Calendar
 

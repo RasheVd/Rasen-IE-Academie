@@ -53,14 +53,22 @@ async function deliver(email: string, fullName: string, role: string, site: stri
   return error ? friendly(error.message) : null;
 }
 
-/** Tautan sekali pakai untuk dikirim admin sendiri. */
+/**
+ * Tautan sekali pakai untuk dikirim admin sendiri (WhatsApp). Tautan menuju langsung ke
+ * `${site}/undangan?token_hash=…&type=…`, lalu halaman itu memverifikasi tokennya sendiri
+ * (supabase.auth.verifyOtp). Jadi tautan tetap benar walau Site URL / Redirect URLs di
+ * Supabase Auth belum diatur.
+ */
 async function manualLink(email: string, fullName: string, site: string) {
   const redirectTo = `${site}/undangan`;
   const existing = await authUserByEmail(email);
+  const type = existing ? 'recovery' : 'invite';
   const { data, error } = existing
     ? await admin.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo } })
     : await admin.auth.admin.generateLink({ type: 'invite', email, options: { redirectTo, data: { full_name: fullName } } });
   if (error) throw new Error(friendly(error.message));
+  const hash = data.properties?.hashed_token;
+  if (hash) return `${redirectTo}?token_hash=${encodeURIComponent(hash)}&type=${type}`;
   return data.properties?.action_link ?? null;
 }
 
