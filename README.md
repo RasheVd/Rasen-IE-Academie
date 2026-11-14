@@ -59,6 +59,16 @@ Project: `jemvkqefasfdctayihfu` (sudah terpasang skema, katalog, fungsi, dan cro
    ```
    Kedua fungsi memeriksa login sendiri. `academie-gcal/callback` dipanggil Google tanpa token Supabase, jadi verifikasi JWT bawaan harus mati.
 
+### Admin pertama masuk
+
+Profil admin (`rasendriya465@gmail.com`) sudah ada di database, tetapi akun login-nya belum dibuat. Buat sekali lewat dasbor:
+
+1. Supabase → Authentication → Users → **Add user → Create new user**.
+2. Email `rasendriya465@gmail.com`, isi kata sandi, centang **Auto Confirm User**.
+3. Buka situs, Masuk dengan email dan kata sandi itu. Profil admin tertaut otomatis.
+
+Setelah itu semua orang lain diundang dari dalam aplikasi (menu Peserta / Mentor).
+
 ### Wajib diisi di dasbor Supabase
 
 **Authentication → URL Configuration**
