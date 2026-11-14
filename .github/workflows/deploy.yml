@@ -1,0 +1,50 @@
+# Build, uji, lalu unggah ke hosting DomaiNesia (public_html academie.my.id) lewat FTPS.
+# Satu langkah manual: tambahkan secret FTP_PASSWORD (kata sandi cPanel) di
+# GitHub → Settings → Secrets and variables → Actions. Tanpa secret itu, workflow
+# tetap build dan menyimpan hasilnya sebagai artifact "situs" untuk diunggah manual.
+name: Deploy academie.my.id
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Nilai publik (sama dengan yang tertanam di JavaScript situs). Jangan taruh service_role key di sini.
+      VITE_SUPABASE_URL: https://jemvkqefasfdctayihfu.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_79fpZMfagxp_lG7XKg--pA_Uak1X36W
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: situs
+          path: dist
+          include-hidden-files: true
+      - name: Unggah ke DomaiNesia
+        if: env.FTP_PASSWORD != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: toscana.id.rapidplex.com
+          username: academie
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: dist/
+          server-dir: public_html/
+      - name: Pengingat secret
+        if: env.FTP_PASSWORD == ''
+        run: echo "::warning::Secret FTP_PASSWORD belum diisi. Hasil build ada di artifact 'situs'; unggah isinya ke public_html lewat File Manager cPanel."

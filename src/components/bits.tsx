@@ -1,138 +1,157 @@
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { format, isToday, isTomorrow } from 'date-fns';
-import { id as localeId } from 'date-fns/locale';
-import type { CourseProgress, Point } from '../domain/progress';
-import { STATUS_LABEL, type Course, type Data, type Profile, type Session } from '../domain/types';
+import { Icon, type IconName } from './Icon';
 import { colorVar } from './ui';
+import { toast } from '../store';
+import { STATE_LABEL, stateOf, type TopicState } from '../domain/mastery';
+import { MODE_LABEL, type Course, type Data, type Profile, type Seat, type Session, type Settings } from '../domain/types';
+import { dayShort, hm, shortDate, timeOf, toLocal } from '../domain/time';
+import { prettyPhone, waLink } from '../domain/wa';
 
-/* ── Format waktu (Indonesia) ────────────────────────────── */
-export const fmt = (iso: string | Date, pattern: string) => format(typeof iso === 'string' ? new Date(iso) : iso, pattern, { locale: localeId });
-export const fmtTime = (iso: string) => fmt(iso, 'HH.mm');
-export const fmtDay = (iso: string) => {
-  const d = new Date(iso);
-  return isToday(d) ? 'Hari ini' : isTomorrow(d) ? 'Besok' : fmt(d, 'EEEE');
-};
-export const fmtDate = (iso: string) => fmt(iso, 'd MMM yyyy');
-export const dayKey = (iso: string) => fmt(iso, 'yyyy-MM-dd');
-export const nameOf = (p?: Profile | null) => (p ? p.full_name || p.email : 'Belum ditentukan');
-export const signed = (n: number | null) => (n == null ? '–' : `${n > 0 ? '+' : ''}${n}`);
-
-/* ── Batang kenaikan: elemen khas ────────────────────────── */
-export function GainBar({ pre, post, compact }: { pre: number | null; post: number | null; compact?: boolean }) {
-  const has = pre != null && post != null;
-  const gain = has ? Math.round((post! - pre!) * 10) / 10 : null;
-  const lo = has ? Math.min(pre!, post!) : 0, hi = has ? Math.max(pre!, post!) : 0;
-  return (
-    <div className="gain" role="img" aria-label={has ? `Rata-rata pretest ${pre}, posttest ${post}, selisih ${signed(gain)}` : 'Belum ada nilai pretest dan posttest'}>
-      <div className="track" style={compact ? { height: 18 } : undefined}>
-        {has && <div className={`seg-fill ${gain! < 0 ? 'neg' : ''}`} style={{ left: `${lo}%`, width: `${hi - lo}%`, ...(compact ? { top: 4, bottom: 4 } : {}) }} />}
-        {has && <div className="mark" style={{ left: `${pre}%`, ...(compact ? { top: 0.5, width: 12, height: 12, marginLeft: -6 } : {}) }} title={`Pretest ${pre}`} />}
-        {has && <div className="mark post" style={{ left: `${post}%`, ...(compact ? { top: 0.5, width: 12, height: 12, marginLeft: -6 } : {}) }} title={`Posttest ${post}`} />}
-      </div>
-      <div className={`delta ${gain == null ? 'muted' : gain >= 0 ? 'up' : 'down'}`}>{signed(gain)}</div>
-    </div>
-  );
-}
-export function GainLegend() {
-  return <div className="gain-legend"><span><i />Pretest</span><span><i className="post" />Posttest</span><span>Skala 0 sampai 100</span></div>;
+export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+export function Avatar({ name, sm }: { name: string; sm?: boolean }) {
+  return <span className={`avatar ${sm ? 'sm' : ''}`} aria-hidden="true">{initials(name)}</span>;
 }
 
-/* ── Batang sesi 60 menit ────────────────────────────────── */
-export function SessionBar({ tall }: { tall?: boolean }) {
-  return (
-    <div className={`sbar ${tall ? 'tall' : ''}`} role="img" aria-label="Susunan sesi 60 menit: pretest 5 menit, materi dan latihan 40 menit, pembahasan 10 menit, posttest 5 menit">
-      <div className="p1">Pre<small>5′</small></div>
-      <div className="p2">Materi dan latihan<small>40 menit</small></div>
-      <div className="p3">Bahas<small>10′</small></div>
-      <div className="p4">Post<small>5′</small></div>
-    </div>
-  );
-}
-
-/* ── Grafik pretest dan posttest per sesi ────────────────── */
-export function ScoreChart({ points }: { points: Point[] }) {
-  const pts = points.filter((p) => p.pre != null || p.post != null);
-  if (pts.length === 0) return <p className="muted small">Grafik muncul setelah nilai sesi pertama diisi.</p>;
-  const W = 640, H = 220, L = 34, R = 12, T = 12, B = 30;
-  const x = (i: number) => (pts.length === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (pts.length - 1));
-  const y = (v: number) => T + ((100 - v) * (H - T - B)) / 100;
-  const line = (k: 'pre' | 'post') => pts.map((p, i) => (p[k] == null ? null : `${x(i)},${y(p[k]!)}`)).filter(Boolean).join(' ');
-  return (
-    <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Nilai per sesi. ${pts.map((p) => `${p.session.code}: pretest ${p.pre ?? 'kosong'}, posttest ${p.post ?? 'kosong'}`).join('. ')}`}>
-      {[0, 25, 50, 75, 100].map((v) => (
-        <g key={v}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="var(--line)" strokeWidth={v === 0 ? 1.5 : 1} /><text x={L - 6} y={y(v) + 4} textAnchor="end">{v}</text></g>
-      ))}
-      {pts.map((p, i) => p.pre != null && p.post != null && <line key={p.session.id} x1={x(i)} x2={x(i)} y1={y(p.pre)} y2={y(p.post)} stroke={p.post >= p.pre ? 'var(--green)' : 'var(--orange)'} strokeWidth={8} />)}
-      <polyline points={line('pre')} fill="none" stroke="var(--ink)" strokeWidth={1.5} strokeDasharray="4 4" />
-      <polyline points={line('post')} fill="none" stroke="var(--ink)" strokeWidth={2} />
-      {pts.map((p, i) => (
-        <g key={p.session.id}>
-          {p.pre != null && <rect x={x(i) - 5} y={y(p.pre) - 5} width={10} height={10} fill="var(--surface)" stroke="var(--ink)" strokeWidth={1.5} />}
-          {p.post != null && <rect x={x(i) - 5} y={y(p.post) - 5} width={10} height={10} fill="var(--ink)" />}
-          <text x={x(i)} y={H - 10} textAnchor="middle">{fmt(p.session.starts_at, 'd/M')}</text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-/* ── Tag status, kode, mata kuliah ───────────────────────── */
-export function StatusTag({ s, due }: { s: Session; due?: boolean }) {
-  if (s.status === 'cancelled') return <span className="tag cancelled">Batal</span>;
-  if (due) return <span className="tag orange">Laporan belum diisi</span>;
-  if (s.status === 'done') return <span className="tag green">Selesai</span>;
-  return <span className="tag plain">{STATUS_LABEL[s.status]}</span>;
-}
-export function CourseChip({ course }: { course?: Course }) {
+export function CourseChip({ course }: { course?: Course | null }) {
   if (!course) return null;
-  return <span className="row" style={{ gap: 7 }}><span className="swatch" style={colorVar(course.color)} /><span className="strong">{course.code}</span></span>;
+  return <span className="chip" style={colorVar(course.color)} title={course.title}>{course.code} · {course.title}</span>;
 }
 
-/* ── Baris sesi ──────────────────────────────────────────── */
-export function SessionRow({ s, data, due, showStudents = true }: { s: Session; data: Data; due?: boolean; showStudents?: boolean }) {
-  const course = data.courses.find((c) => c.id === s.course_id);
-  const mentor = data.profiles.find((p) => p.id === s.mentor_id);
-  const students = data.links.filter((l) => l.session_id === s.id).map((l) => data.profiles.find((p) => p.id === l.student_id)).filter(Boolean) as Profile[];
+const STATE_ICON: Record<TopicState, IconName> = { need: 'alert', practice: 'refresh', mastered: 'check', none: 'minus' };
+export function StatePill({ state }: { state: TopicState }) {
+  const cls = state === 'need' ? 'bad' : state === 'practice' ? 'warn' : state === 'mastered' ? 'ok' : '';
+  return <span className={`pill ${cls}`}><Icon name={STATE_ICON[state]} size={12} />{STATE_LABEL[state]}</span>;
+}
+export const stateIcon = (s: TopicState) => STATE_ICON[s];
+
+export function Score({ value, settings }: { value: number | null | undefined; settings: Settings }) {
+  if (value == null) return <span className="faint">–</span>;
+  return <span className={`score ${stateOf(value, settings)}`}>{Math.round(value)}</span>;
+}
+export function ScoreChange({ pre, post, settings }: { pre: number | null; post: number | null; settings: Settings }) {
   return (
-    <Link to={`/sesi/${s.id}`} className="rowlink session-row" data-testid="session-row">
-      <span className="time">{fmtTime(s.starts_at)}</span>
-      <span className="c-code"><span className="code">{s.code}</span></span>
-      <span className="grow"><span className="row" style={{ gap: 8 }}><CourseChip course={course} /><span className="ellipsis">{s.topic || course?.title}</span></span></span>
-      <span className="who ellipsis">{mentor ? nameOf(mentor) : 'Mentor belum ditentukan'}{showStudents && students.length ? ` · ${students.map(nameOf).join(', ')}` : ''}{s.place ? ` · ${s.place}` : ''}</span>
-      <StatusTag s={s} due={due} />
+    <span className="row nowrap" style={{ gap: 6 }}>
+      <Score value={pre} settings={settings} />
+      <Icon name="arrowR" size={12} className="faint" />
+      <Score value={post} settings={settings} />
+    </span>
+  );
+}
+
+export function WaButton({ phone, text, label = 'WhatsApp', sm, block }: { phone: string; text?: string; label?: string; sm?: boolean; block?: boolean }) {
+  if (!phone) return null;
+  return (
+    <a className={`btn wa ${sm ? 'sm' : ''} ${block ? 'block' : ''}`} href={waLink(phone, text)} target="_blank" rel="noreferrer">
+      <Icon name="chat" size={sm ? 14 : 16} />{label}
+    </a>
+  );
+}
+
+export function AdminContact({ settings, text, compact }: { settings: Settings; text?: string; compact?: boolean }) {
+  const pretty = prettyPhone(settings.admin_whatsapp);
+  if (compact) return <WaButton phone={settings.admin_whatsapp} text={text} label={`Admin ${settings.admin_whatsapp_label}`} sm />;
+  return (
+    <div className="card stack sm">
+      <div className="h-card">Butuh bantuan?</div>
+      <p className="small muted">Jadwal, pembayaran, laporan, atau merasa kurang cocok dengan sesi: hubungi admin.</p>
+      <div className="strong num">{pretty} <span className="muted" style={{ fontWeight: 500 }}>({settings.admin_whatsapp_label})</span></div>
+      <WaButton phone={settings.admin_whatsapp} text={text ?? 'Halo admin IE.Academie, saya mau bertanya.'} label="Chat admin di WhatsApp" block />
+    </div>
+  );
+}
+export { prettyPhone };
+
+export function SessionPill({ session, seat }: { session: Session; seat?: Seat | null }) {
+  if (session.status === 'cancelled') return <span className="pill bad">Batal</span>;
+  if (session.status === 'done') return <span className="pill">Selesai</span>;
+  if (seat?.payment_status === 'pending') return <span className="pill warn">{seat.proof_path ? 'Menunggu konfirmasi' : 'Menunggu bayar'}</span>;
+  if (Date.parse(session.ends_at) < Date.now()) return <span className="pill warn">Perlu laporan</span>;
+  return <span className="pill ok">Terjadwal</span>;
+}
+
+export function WhenBox({ iso }: { iso: string }) {
+  const l = toLocal(iso);
+  return (
+    <div className="when" aria-hidden="true">
+      <div className="d">{dayShort(l.date)}</div>
+      <div className="n">{l.d}</div>
+      <div className="h">{hm(l.min)}</div>
+    </div>
+  );
+}
+
+/** Satu baris sesi untuk daftar: tanggal, mata kuliah, topik, mentor/peserta, status. */
+export function SessionItem({ s, data, me, showStudents }: { s: Session; data: Data; me: Profile; showStudents?: boolean }) {
+  const course = data.courses.find((c) => c.id === s.course_id);
+  const topic = data.topics.find((t) => t.id === s.topic_id);
+  const mentor = data.profiles.find((p) => p.id === s.mentor_id);
+  const seats = data.seats.filter((x) => x.session_id === s.id);
+  const mySeat = seats.find((x) => x.student_id === me.id);
+  const names = seats.map((x) => data.profiles.find((p) => p.id === x.student_id)?.full_name.split(' ')[0] ?? 'Peserta');
+  const l = toLocal(s.starts_at);
+  return (
+    <Link to={`/sesi/${s.id}`} className="list-item link">
+      <WhenBox iso={s.starts_at} />
+      <div className="grow">
+        <div className="t">{course?.title ?? 'Mata kuliah'}{topic ? <span className="muted" style={{ fontWeight: 500 }}> · {topic.title}</span> : null}</div>
+        <div className="meta">
+          {shortDate(l.date)} {timeOf(s.starts_at)}–{timeOf(s.ends_at)} WIB · {MODE_LABEL[s.mode]}{s.mode === 'group' ? ` ${seats.length}/5` : ''}
+          {me.role !== 'mentor' && mentor ? ` · ${mentor.full_name}` : ''}
+          {showStudents && names.length ? ` · ${names.join(', ')}` : ''}
+        </div>
+      </div>
+      <SessionPill session={s} seat={mySeat} />
     </Link>
   );
 }
 
-/** Daftar sesi berkelompok per hari. */
-export function SessionDays({ sessions, data, dueIds }: { sessions: Session[]; data: Data; dueIds?: Set<string> }) {
-  const days = new Map<string, Session[]>();
-  for (const s of sessions) { const k = dayKey(s.starts_at); (days.get(k) ?? days.set(k, []).get(k)!).push(s); }
+export function Banner({ tone = 'info', icon = 'info', title, children, action }: { tone?: 'info' | 'warn' | 'bad' | 'ok'; icon?: IconName; title: ReactNode; children?: ReactNode; action?: ReactNode }) {
   return (
-    <>
-      {[...days.entries()].map(([k, list]) => (
-        <div key={k}>
-          <div className={`day-head ${isToday(new Date(list[0].starts_at)) ? 'today' : ''}`}><span className="d">{fmtDay(list[0].starts_at)}</span><span className="mono muted">{fmt(list[0].starts_at, 'd MMMM yyyy')}</span></div>
-          <ul className="list stagger">{list.map((s) => <li key={s.id}><SessionRow s={s} data={data} due={dueIds?.has(s.id)} /></li>)}</ul>
-        </div>
-      ))}
-    </>
+    <div className={`banner ${tone}`} role={tone === 'bad' ? 'alert' : undefined}>
+      <Icon name={icon} size={18} className="ic" />
+      <div className="grow">
+        <div>{title}</div>
+        {children && <p>{children}</p>}
+      </div>
+      {action}
+    </div>
   );
 }
 
-/* ── Kartu progres mata kuliah ───────────────────────────── */
-export function ProgressCard({ course, p, to }: { course: Course; p: CourseProgress; to?: string }) {
-  const body = (
-    <>
-      <div className="row between"><span className="code">{course.code}</span><span className="mono muted">{p.done} dari {p.target} sesi</span></div>
-      <div className="t">{course.title}</div>
-      <GainBar pre={p.avgPre} post={p.avgPost} />
-      <div className="meta">
-        <div><b>{p.avgPre ?? '–'}</b><span>Pretest</span></div>
-        <div><b>{p.avgPost ?? '–'}</b><span>Posttest</span></div>
-        <div><b>{p.done ? `${p.attended}/${p.done}` : '–'}</b><span>Hadir</span></div>
-      </div>
-    </>
+export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
+  return (
+    <div className="card stat">
+      <div className="label">{label}</div>
+      <div className="value">{value}</div>
+      {sub && <div className="small muted">{sub}</div>}
+    </div>
   );
-  return to ? <Link to={to} className="pcard" style={colorVar(course.color)}>{body}</Link> : <div className="pcard" style={colorVar(course.color)}>{body}</div>;
+}
+
+export function Loading({ label = 'Memuat…' }: { label?: string }) {
+  return <div className="loading"><div className="row"><div className="spinner" /><span>{label}</span></div></div>;
+}
+
+/** Jalankan aksi async: tombol nonaktif selama proses, galat tampil sebagai toast. */
+export function useAction() {
+  const [busy, setBusy] = useState<string | null>(null);
+  async function run<T>(key: string, f: () => Promise<T>, success?: string): Promise<T | undefined> {
+    setBusy(key);
+    try {
+      const r = await f();
+      if (success) toast(success);
+      return r;
+    } catch (e) {
+      toast((e as Error).message, 'error');
+      return undefined;
+    } finally {
+      setBusy(null);
+    }
+  }
+  return { busy, run };
+}
+
+export function ExtLink({ href, children }: { href: string; children: ReactNode }) {
+  return <a href={href} target="_blank" rel="noreferrer" className="row" style={{ display: 'inline-flex', gap: 4 }}>{children}<Icon name="external" size={13} /></a>;
 }

@@ -84,7 +84,7 @@ export function ConfirmHost() {
   return (
     <Modal title={req.title} onClose={() => done(false)} footer={<>
       <button className="btn" onClick={() => done(false)}>Batal</button>
-      <button className={`btn ${req.danger ? 'orange' : 'primary'}`} onClick={() => done(true)} data-autofocus>{req.confirm}</button>
+      <button className={`btn ${req.danger ? 'danger solid' : 'primary'}`} onClick={() => done(true)} data-autofocus>{req.confirm}</button>
     </>}>
       <div>{req.body}</div>
     </Modal>
