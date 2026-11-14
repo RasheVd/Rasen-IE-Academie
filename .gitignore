@@ -7,3 +7,4 @@ e2e/screenshots
 .env
 *.tsbuildinfo
 e2e/state.json
+academie-situs.zip
