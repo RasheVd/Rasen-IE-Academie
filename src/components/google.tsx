@@ -6,7 +6,7 @@ import { confirmDialog } from './ui';
 import { connectGcal, disconnectGcal, refreshGcal, toast, useMe, useStore } from '../store';
 
 const WHY = {
-  student: '',
+  student: 'Opsional. Sambungkan bila kamu ingin sesi tertulis langsung di kalendermu dengan 5 pengingat: 5 hari, 3 hari, 1 hari, 6 jam, dan 1 jam sebelumnya. Tanpa ini, undangan tetap masuk ke email-mu.',
   mentor: 'Jam ketersediaanmu tampil biru di kalender "IE.Academie", berubah merah dengan nama peserta saat dibooking, dengan 5 pengingat. Jam sibuk di kalender pribadimu otomatis disembunyikan dari peserta.',
   admin: 'Semua sesi muncul di kalender "IE.Academie" milik admin dengan pengingat H-1. Mentor yang belum menyambungkan Google memakai kalender admin sebagai cadangan.',
 };
@@ -54,7 +54,7 @@ export function GoogleCard() {
   return (
     <div className="card stack">
       <div className="row between wrap">
-        <div className="row"><Icon name="calendar" size={20} /><div className="h-card">Google Calendar</div></div>
+        <div className="row"><Icon name="calendar" size={20} /><div className="h-card">Google Calendar{me.role === 'student' ? ' (opsional)' : ''}</div></div>
         {gcal?.connected ? <span className="pill ok"><Icon name="check" size={12} />Tersambung</span> : <span className="pill">Belum tersambung</span>}
       </div>
       <p className="small muted">{WHY[me.role]}</p>

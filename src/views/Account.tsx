@@ -19,7 +19,8 @@ export default function Account() {
   return (
     <Shell title="Akun & Google" narrow>
       <div className="page-head"><div><h1 className="h-page">Akun & Google</h1><p className="lead">{me.email} · {ROLE_LABEL[me.role]}</p></div></div>
-      {me.role === 'student' ? <StudentCalendarInfo /> : <GoogleCard />}
+      {me.role === 'student' && <StudentCalendarInfo />}
+      <GoogleCard />
       <section className="card stack">
         <div className="h-card">Profil</div>
         <div className="form-grid">
