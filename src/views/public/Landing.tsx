@@ -148,7 +148,7 @@ export function Landing() {
             <ol className="lp-panels">
               <li><b className="n">01</b><h3>Admin mendaftarkanmu</h3><p>Kamu menerima email undangan dan membuat kata sandi sendiri. Mata kuliahmu sudah terpasang.</p></li>
               <li><b className="n">02</b><h3>Pilih jam dan mentor</h3><p>Kamu hanya melihat mentor yang mengajar mata kuliahmu. Booking paling lambat 24 jam sebelum mulai.</p></li>
-              <li><b className="n">03</b><h3>Bayar, lalu masuk kalender</h3><p>Upload bukti transfer. Setelah admin konfirmasi, sesi muncul di Google Calendar-mu dengan lima pengingat.</p></li>
+              <li><b className="n">03</b><h3>Bayar, lalu masuk kalender</h3><p>Upload bukti transfer. Setelah admin konfirmasi, undangan sesi masuk ke email-mu dan tercatat di Google Calendar.</p></li>
               <li><b className="n">04</b><h3>Lihat nilaimu naik</h3><p>Mentor mencatat pretest dan posttest. Dasbormu menandai topik yang perlu kamu ulang.</p></li>
             </ol>
           </div>

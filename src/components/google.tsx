@@ -6,7 +6,7 @@ import { confirmDialog } from './ui';
 import { connectGcal, disconnectGcal, refreshGcal, toast, useMe, useStore } from '../store';
 
 const WHY = {
-  student: 'Sesi yang sudah dibayar masuk kalendermu dengan 5 pengingat: 5 hari, 3 hari, 1 hari, 6 jam, dan 1 jam sebelumnya, lengkap dengan tautan pretest dan posttest.',
+  student: '',
   mentor: 'Jam ketersediaanmu tampil biru di kalender "IE.Academie", berubah merah dengan nama peserta saat dibooking, dengan 5 pengingat. Jam sibuk di kalender pribadimu otomatis disembunyikan dari peserta.',
   admin: 'Semua sesi muncul di kalender "IE.Academie" milik admin dengan pengingat H-1. Mentor yang belum menyambungkan Google memakai kalender admin sebagai cadangan.',
 };
@@ -16,7 +16,7 @@ export function GoogleBanner({ returnPath = '/beranda' }: { returnPath?: string 
   const gcal = useStore((r) => r.gcal);
   const me = useMe();
   const { busy, run } = useAction();
-  if (!gcal || gcal.connected || !gcal.configured) return null;
+  if (!gcal || gcal.connected || !gcal.configured || me.role === 'student') return null;
   return (
     <Banner tone="info" icon="calendar" title="Sambungkan Google Calendar" action={
       <button className="btn primary sm" disabled={!!busy} onClick={() => run('g', () => connectGcal(returnPath))}>{busy ? 'Membuka Google…' : 'Sambungkan'}</button>
@@ -24,7 +24,19 @@ export function GoogleBanner({ returnPath = '/beranda' }: { returnPath?: string 
   );
 }
 
-/** Kartu status Google di halaman Akun. */
+/** Peserta tidak menyambungkan Google: undangan sesi datang lewat email. */
+export function StudentCalendarInfo() {
+  const me = useMe();
+  return (
+    <div className="card stack sm">
+      <div className="row"><Icon name="calendar" size={20} /><div className="h-card">Google Calendar</div></div>
+      <p className="small">Kamu tidak perlu menyambungkan akun Google. Setelah pembayaranmu dikonfirmasi, undangan sesi dikirim ke <b>{me.email}</b>.</p>
+      <p className="small muted">Buka emailnya dan klik <b>Ya</b> pada undangan. Sesi masuk Google Calendar-mu lengkap dengan link kelas, pretest, dan posttest. Pengingatnya mengikuti pengaturan Google Calendar-mu sendiri.</p>
+    </div>
+  );
+}
+
+/** Kartu status Google di halaman Akun (admin dan mentor). */
 export function GoogleCard() {
   const gcal = useStore((r) => r.gcal);
   const me = useMe();

@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { Icon } from '../../components/Icon';
-import { GoogleBanner } from '../../components/google';
 import { AdminContact, Banner, ExtLink, SessionItem } from '../../components/bits';
 import { Empty } from '../../components/ui';
 import { useData, useMe } from '../../store';
@@ -51,7 +50,6 @@ export default function StudentHome() {
           Kredit terpakai otomatis saat kamu booking sesi berikutnya, tanpa perlu bayar lagi.
         </Banner>
       )}
-      <GoogleBanner />
 
       {enrolled.length === 0 ? (
         <div className="card">

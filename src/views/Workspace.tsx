@@ -63,7 +63,7 @@ export function tasksFor(data: Data, me: Profile, now: number, gcal: Gcal | null
     if (!data.settings.bank_account) out.push({ id: 'bank', icon: 'wallet', tone: 'warn', title: 'Isi nomor rekening pembayaran', to: '/pengaturan/bisnis' });
     if (gcal?.configured && !gcal.connected) out.push({ id: 'gcal', icon: 'calendar', title: 'Sambungkan Google Calendar admin', to: '/pengaturan' });
   }
-  if (me.role !== 'admin' && gcal?.configured && !gcal.connected) out.push({ id: 'gcal', icon: 'calendar', title: 'Sambungkan Google Calendar', sub: 'Supaya pengingat masuk HP', to: '/pengaturan' });
+  if (me.role === 'mentor' && gcal?.configured && !gcal.connected) out.push({ id: 'gcal', icon: 'calendar', title: 'Sambungkan Google Calendar', sub: 'Slot dan sesimu masuk kalender', to: '/pengaturan' });
   return out;
 }
 

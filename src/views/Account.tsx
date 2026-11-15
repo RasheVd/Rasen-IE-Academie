@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Shell } from '../components/Shell';
 import { Field } from '../components/ui';
-import { GoogleCard } from '../components/google';
+import { GoogleCard, StudentCalendarInfo } from '../components/google';
 import { AdminContact, useAction } from '../components/bits';
 import { auth, updateMyProfile, updatePrefs, useData, useMe } from '../store';
 import { Link } from 'react-router-dom';
@@ -19,7 +19,7 @@ export default function Account() {
   return (
     <Shell title="Akun & Google" narrow>
       <div className="page-head"><div><h1 className="h-page">Akun & Google</h1><p className="lead">{me.email} · {ROLE_LABEL[me.role]}</p></div></div>
-      <GoogleCard />
+      {me.role === 'student' ? <StudentCalendarInfo /> : <GoogleCard />}
       <section className="card stack">
         <div className="h-card">Profil</div>
         <div className="form-grid">

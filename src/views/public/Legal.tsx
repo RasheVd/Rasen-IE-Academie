@@ -24,7 +24,7 @@ export function Privacy() {
         </ul>
 
         <h2>Google Calendar</h2>
-        <p>Bila kamu menyambungkan akun Google, IE.Academie meminta izin berikut dan memakainya hanya untuk keperluan di bawah ini:</p>
+        <p>Peserta tidak menyambungkan akun Google; undangan sesi dikirim ke email peserta. Admin dan mentor yang menyambungkan akun Google memberi izin berikut, dan IE.Academie memakainya hanya untuk keperluan di bawah ini:</p>
         <ul>
           <li><b>Membuat kalender terpisah bernama "IE.Academie"</b> (mentor dan admin) untuk slot ketersediaan dan sesi.</li>
           <li><b>Membuat, mengubah, dan menghapus acara sesi</b> beserta pengingatnya, dan mengatur pengingat pada undangan sesi di kalendermu.</li>
