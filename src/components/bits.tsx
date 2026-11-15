@@ -48,12 +48,12 @@ export function WaButton({ phone, text, label = 'WhatsApp', sm, block }: { phone
   );
 }
 
-export function AdminContact({ settings, text, compact }: { settings: Settings; text?: string; compact?: boolean }) {
+export function AdminContact({ settings, text, compact, bare }: { settings: Settings; text?: string; compact?: boolean; bare?: boolean }) {
   const pretty = prettyPhone(settings.admin_whatsapp);
   if (compact) return <WaButton phone={settings.admin_whatsapp} text={text} label={`Admin ${settings.admin_whatsapp_label}`} sm />;
   return (
-    <div className="card stack sm">
-      <div className="h-card">Butuh bantuan?</div>
+    <div className={bare ? 'stack sm' : 'card stack sm'}>
+      {!bare && <div className="h-card">Butuh bantuan?</div>}
       <p className="small muted">Jadwal, pembayaran, laporan, atau merasa kurang cocok dengan sesi: hubungi admin.</p>
       <div className="strong num">{pretty} <span className="muted" style={{ fontWeight: 500 }}>({settings.admin_whatsapp_label})</span></div>
       <WaButton phone={settings.admin_whatsapp} text={text ?? 'Halo admin IE.Academie, saya mau bertanya.'} label="Chat admin di WhatsApp" block />

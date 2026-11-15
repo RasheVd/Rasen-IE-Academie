@@ -64,12 +64,18 @@ export default function BusinessSettings() {
       <section className="card stack">
         <div className="h-card">Tampilan situs</div>
         <p className="small muted">Warna dipakai di halaman depan dan semua dasbor. Teks kosong memakai teks bawaan.</p>
+        <div className="row wrap between">
+          <div><div className="strong small">Gaya dasbor</div><div className="small muted">Komik: sidebar tinta, judul tegas, bayangan offset. Polos: tampilan tenang tanpa ornamen.</div></div>
+          <div className="seg" role="group" aria-label="Gaya dasbor">
+            {(['komik', 'polos'] as const).map((st) => <button key={st} type="button" aria-pressed={(f.theme?.style ?? 'komik') === st} onClick={() => setF({ ...f, theme: { ...f.theme, style: st } })}>{st === 'komik' ? 'Komik' : 'Polos'}</button>)}
+          </div>
+        </div>
         <div className="row wrap" role="radiogroup" aria-label="Preset warna">
           {PRESETS.map((p) => {
             const on = (f.theme?.preset ?? DEFAULT_PRESET) === p.id && !f.theme?.primary && !f.theme?.accent;
             return (
               <button key={p.id} type="button" role="radio" aria-checked={on} className={`choice ${on ? '' : ''}`} style={{ minWidth: 170 }} aria-pressed={on}
-                onClick={() => setF({ ...f, theme: { preset: p.id } })}>
+                onClick={() => setF({ ...f, theme: { preset: p.id, style: f.theme?.style } })}>
                 <span className="row"><i style={{ width: 18, height: 18, borderRadius: 5, background: p.primary, display: 'inline-block' }} /><i style={{ width: 18, height: 18, borderRadius: 5, background: p.accent, display: 'inline-block' }} /></span>
                 <span className="t">{p.name}</span>
               </button>

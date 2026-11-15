@@ -101,7 +101,7 @@ export default function Workspace() {
     todo: <Todos />,
     agenda: <Agenda data={data} me={me} now={now} />,
     ringkas: <Summary data={data} me={me} now={now} />,
-    kontak: <AdminContact settings={data.settings} />,
+    kontak: <AdminContact settings={data.settings} bare />,
   };
 
   return (
@@ -188,7 +188,7 @@ function Summary({ data, me, now }: { data: Data; me: Profile; now: number }) {
   if (me.role === 'student') {
     const c = stateCounts(topicProgress(data, me.id));
     return (
-      <div className="tiles" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+      <div className="tiles mini" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
         <div className="tile need" style={{ padding: 10 }}><div className="tile-top"><Icon name="alert" size={14} /><span className="small">Konsultasi</span><span className="count num" style={{ fontSize: 24 }}>{c.need}</span></div></div>
         <div className="tile practice" style={{ padding: 10 }}><div className="tile-top"><Icon name="refresh" size={14} /><span className="small">Dilatih</span><span className="count num" style={{ fontSize: 24 }}>{c.practice}</span></div></div>
         <div className="tile mastered" style={{ padding: 10 }}><div className="tile-top"><Icon name="check" size={14} /><span className="small">Dikuasai</span><span className="count num" style={{ fontSize: 24 }}>{c.mastered}</span></div></div>

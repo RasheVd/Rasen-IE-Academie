@@ -89,15 +89,12 @@ function Stage({ enabled, accent }: { enabled: boolean; accent: string }) {
   }, [enabled, accent]);
   return (
     <div className="lp-stage" ref={stage}>
-      <div className="lp-burst" aria-hidden="true" />
       {mode !== 'still' && (
         <canvas ref={canvas} className="lp-canvas" tabIndex={0}
-          aria-label="Ilustrasi 3D buku terbuka dengan pecahan grafis merah, hitam, dan putih. Seret atau pakai tombol panah untuk memutar." />
+          aria-label="Buku catatan 3D terbuka berisi catatan dan grafik nilai yang naik. Seret atau pakai tombol panah untuk memutar, tekan Enter untuk membalik halaman." />
       )}
-      {mode === 'still' && <img className="lp-canvas" src="/landing/fallback-scene.svg" alt="Ilustrasi buku terbuka dengan pecahan grafis merah, hitam, dan putih" width={1000} height={900} />}
-      <span className="lp-sticker s1" aria-hidden="true">Kamu pilih jamnya</span>
-      <span className="lp-sticker s2" aria-hidden="true">Nilai per topik</span>
-      {mode === '3d' && <span className="lp-hint" aria-hidden="true">Seret untuk memutar</span>}
+      {mode === 'still' && <img className="lp-canvas" src="/landing/book.webp" alt="Buku catatan terbuka berisi catatan dan grafik nilai yang naik" width={1190} height={1096} />}
+      {mode === '3d' && <span className="lp-hint" aria-hidden="true">Seret untuk memutar · klik untuk membalik halaman</span>}
     </div>
   );
 }

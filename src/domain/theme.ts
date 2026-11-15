@@ -39,6 +39,8 @@ export function applyTheme(t: SiteTheme | undefined) {
   s.setProperty('--accent', accent);
   s.setProperty('--series', accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary);
+  // Gaya komik (bawaan) atau polos, dipilih admin.
+  document.body?.classList.toggle('komik', (t?.style ?? 'komik') === 'komik');
 }
 
 /** Teks halaman depan: isian admin, atau teks bawaan bila kosong. */

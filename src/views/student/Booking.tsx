@@ -126,7 +126,7 @@ export default function Booking() {
         </>}>
           <div className="summary">
             <div><span>Mata kuliah</span><span>{data.courses.find((c) => c.id === courseId)?.title}</span></div>
-            <div><span>Topik</span><span>{data.topics.find((t) => t.id === pickTopic)?.title ?? 'Belum dipilih'}</span></div>
+            <div><span>Topik</span><span>{data.topics.find((t) => t.id === pickTopic)?.title ?? (topics.length === 0 ? 'Dibahas bersama mentor' : 'Belum dipilih')}</span></div>
             <div><span>Waktu</span><span>{longDate(pick.date)}, {hm(pick.min)}–{hm(pick.min + 60)} WIB</span></div>
             <div><span>Mentor</span><span>{mentors.find((m) => m.id === pick.mentor_id)?.full_name}</span></div>
             <div><span>Jenis</span><span>{MODE_LABEL[mode]}{pick.join ? ` (bergabung, ${pick.join.seats + 1}/5)` : mode === 'group' ? (open ? ' (terbuka)' : ' (tertutup)') : ''}</span></div>

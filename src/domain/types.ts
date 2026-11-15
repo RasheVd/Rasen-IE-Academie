@@ -15,7 +15,7 @@ export interface Settings {
   theme: SiteTheme; content: SiteContent;
 }
 /** Warna situs yang diatur admin. Kosong = bawaan. */
-export interface SiteTheme { preset?: string; primary?: string; accent?: string; ink?: string; bg?: string }
+export interface SiteTheme { preset?: string; primary?: string; accent?: string; ink?: string; bg?: string; style?: 'komik' | 'polos' }
 /** Teks halaman depan yang diatur admin. Kosong = teks bawaan. */
 export interface SiteContent { hero_title?: string; hero_accent?: string; hero_lead?: string; cta_label?: string; about?: string; intro_3d?: boolean }
 /** Preferensi pribadi tiap orang. */
