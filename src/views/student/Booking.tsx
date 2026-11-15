@@ -8,7 +8,7 @@ import { book, toast, useData, useMe } from '../../store';
 import { useTitle } from '../../hooks';
 import { hm, longDate, rupiah } from '../../domain/time';
 import type { Slot } from '../../domain/slots';
-import { MODE_LABEL, type BookingOptions, type Mode } from '../../domain/types';
+import { MODE_LABEL, courseGroup, groupCourses, type BookingOptions, type Mode } from '../../domain/types';
 
 export default function Booking() {
   useTitle('Booking sesi');
@@ -29,6 +29,8 @@ export default function Booking() {
   const topics = useMemo(() => data.topics.filter((t) => t.course_id === courseId).sort((a, b) => a.position - b.position), [data.topics, courseId]);
   const credits = data.credits.filter((c) => c.student_id === me.id && !c.used_session && (!c.course_id || c.course_id === courseId));
   const validTopic = topics.some((t) => t.id === topicId);
+  // Mata kuliah tanpa daftar topik: topik dibahas bersama mentor di awal sesi.
+  const topicReady = validTopic || topics.length === 0;
 
   if (!courses.length) return (
     <Shell title="Booking sesi" narrow>
@@ -51,26 +53,31 @@ export default function Booking() {
       <div className="steps">
         <section className="card">
           <div className="step-title"><span className="n">1</span>Mata kuliah</div>
+          {groupCourses(courses).map(([g, list]) => (
+          <div key={g} className="stack sm" style={{ marginTop: 8 }}>
+          {groupCourses(courses).length > 1 && <div className="tiny muted strong">{g}</div>}
           <div className="choice-grid">
-            {courses.map((c) => (
+            {list.map((c) => (
               <button key={c.id} className="choice" aria-pressed={courseId === c.id} onClick={() => { setCourseId(c.id); setTopicId(''); setPick(null); setMentorId(''); }}>
-                <span className="t">{c.title}</span><span className="s">{c.code} · {c.category}</span>
+                <span className="t">{c.title}</span><span className="s">{c.code} · {courseGroup(c)}</span>
               </button>
             ))}
           </div>
+          </div>
+          ))}
         </section>
 
         {courseId && (
           <section className="card">
             <div className="step-title"><span className="n">2</span>Topik dan jenis kelas</div>
             <div className="form-grid">
-              <Field label="Topik yang mau dipelajari" hint="Dipakai untuk pretest, posttest, dan dasbor progresmu.">
-                {(id) => (
+              <Field label="Topik yang mau dipelajari" hint={topics.length ? 'Dipakai untuk pretest, posttest, dan dasbor progresmu.' : 'Daftar topik mata kuliah ini belum diisi admin. Ceritakan materinya ke mentor di awal sesi.'}>
+                {(id) => topics.length ? (
                   <select id={id} className="select" value={validTopic ? topicId : ''} onChange={(e) => setTopicId(e.target.value)}>
                     <option value="">Pilih topik…</option>
                     {topics.map((t, i) => <option key={t.id} value={t.id}>{i + 1}. {t.title}</option>)}
                   </select>
-                )}
+                ) : <input id={id} className="input" value="Dibahas bersama mentor" disabled />}
               </Field>
               <Field label="Mentor">
                 {(id) => (
@@ -101,13 +108,13 @@ export default function Booking() {
         {courseId && (
           <section className="card">
             <div className="step-title"><span className="n">3</span>Pilih jam</div>
-            {!validTopic && <p className="small muted" style={{ marginBottom: 10 }}>Pilih topik dulu supaya nilai tercatat di topik yang benar. Bergabung ke kelas bersama yang sudah ada memakai topik kelas itu.</p>}
+            {!topicReady && <p className="small muted" style={{ marginBottom: 10 }}>Pilih topik dulu supaya nilai tercatat di topik yang benar. Bergabung ke kelas bersama yang sudah ada memakai topik kelas itu.</p>}
             <div className="cal-legend" style={{ marginBottom: 12 }}>
               <span><i className="free" />Slot kosong</span>
               {mode === 'group' && <span><i style={{ background: '#efeafd', borderColor: '#9b8ce0' }} />Kelas bersama yang bisa kamu ikuti</span>}
             </div>
             <SlotPicker courseId={courseId} mode={mode} mentorId={mentorId} onMentors={setMentors}
-              onPick={(sl) => { if (!sl.join && !validTopic) { toast('Pilih topik dulu di langkah 2.', 'error'); return; } setPick(sl); }} />
+              onPick={(sl) => { if (!sl.join && !topicReady) { toast('Pilih topik dulu di langkah 2.', 'error'); return; } setPick(sl); }} />
           </section>
         )}
       </div>

@@ -7,7 +7,7 @@ import { SlotPicker } from '../components/SlotPicker';
 import { Avatar, Banner, CourseChip, ExtLink, Score, ScoreChange, SessionPill, StatePill, WaButton, useAction } from '../components/bits';
 import {
   SITE, cancelPending, cancelSession, confirmPayment, markReady, proofUrl, rateSession, rejectPayment, reschedule,
-  submitReport, syncSessionNow, updateSession, uploadProof, useData, useMe, useStore,
+  setSessionTests, submitReport, syncSessionNow, updateSession, uploadProof, useData, useMe, useStore,
 } from '../store';
 import { useNow, useTitle } from '../hooks';
 import { hm, longDate, rupiah, shortDate, timeOf, toLocal, until } from '../domain/time';
@@ -221,6 +221,7 @@ function StaffPanel({ s, seats, data, me }: { s: Session; seats: Seat[]; data: D
           Pelajari materi dan konteks peserta paling lambat H-1, lalu klik tombol ini supaya admin tahu.
         </Banner>
       )}
+      {isMentor && s.status !== 'cancelled' && <TestLinks s={s} data={data} />}
       {overdue && <Banner tone="warn" icon="note" title="Laporan sesi belum diisi" action={<button className="btn primary sm" onClick={() => setReporting(true)}>Isi laporan</button>}>Isi kehadiran dan nilai paling lambat 24 jam setelah sesi.</Banner>}
 
       <div className="card">
@@ -265,6 +266,37 @@ function StaffPanel({ s, seats, data, me }: { s: Session; seats: Seat[]; data: D
   );
 }
 const started = (s: Session, now: number) => Date.parse(s.starts_at) <= now;
+
+/** Mentor mengisi link Google Form pretest dan posttest untuk sesinya. Kosong = pakai link bawaan topik. */
+function TestLinks({ s, data }: { s: Session; data: Data }) {
+  const topic = data.topics.find((t) => t.id === s.topic_id);
+  const { busy, run } = useAction();
+  const [pre, setPre] = useState(s.pretest_url);
+  const [post, setPost] = useState(s.posttest_url);
+  const bad = [pre, post].some((v) => v.trim() && !/^https?:\/\//i.test(v.trim()));
+  const changed = pre !== s.pretest_url || post !== s.posttest_url;
+  return (
+    <div className="card stack">
+      <div className="row between wrap">
+        <div className="h-card">Link pretest dan posttest</div>
+        <span className="small muted">Peserta melihat tombolnya di halaman sesi dan di Google Calendar.</span>
+      </div>
+      <div className="form-grid">
+        <Field label="Pretest (menit 0–5)" hint={topic?.pretest_url ? 'Kosongkan untuk memakai link bawaan topik.' : 'Tempel link Google Form.'}>
+          {(id) => <input id={id} className="input" value={pre} onChange={(e) => setPre(e.target.value)} placeholder={topic?.pretest_url || 'https://forms.gle/…'} />}
+        </Field>
+        <Field label="Posttest (menit 55–60)" hint={topic?.posttest_url ? 'Kosongkan untuk memakai link bawaan topik.' : 'Tempel link Google Form.'}>
+          {(id) => <input id={id} className="input" value={post} onChange={(e) => setPost(e.target.value)} placeholder={topic?.posttest_url || 'https://forms.gle/…'} />}
+        </Field>
+      </div>
+      {bad && <span className="small" role="alert" style={{ color: 'var(--danger)' }}>Link harus diawali https://</span>}
+      <div className="row wrap">
+        <button className="btn primary" disabled={!changed || bad || !!busy} onClick={() => run('t', () => setSessionTests(s.id, pre, post), 'Link tes tersimpan.')}>Simpan link tes</button>
+        <span className="small muted">Nilainya kamu isi di laporan setelah sesi.</span>
+      </div>
+    </div>
+  );
+}
 
 function ReportModal({ s, seats, data, onClose }: { s: Session; seats: Seat[]; data: Data; onClose: () => void }) {
   const { busy, run } = useAction();

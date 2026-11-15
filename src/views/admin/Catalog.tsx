@@ -5,7 +5,7 @@ import { Field, InlineInput, Modal, confirmDialog, colorVar } from '../../compon
 import { useAction } from '../../components/bits';
 import { moveTopic, removeTopic, saveCourse, saveTopic, useData } from '../../store';
 import { useTitle } from '../../hooks';
-import { COURSE_COLORS, type Course, type CourseColor, type Data } from '../../domain/types';
+import { COURSE_COLORS, groupCourses, type Course, type CourseColor, type Data } from '../../domain/types';
 
 export default function Catalog() {
   useTitle('Katalog');
@@ -15,7 +15,8 @@ export default function Catalog() {
   const [editing, setEditing] = useState<Partial<Course> | null>(null);
   const n = q.trim().toLowerCase();
   const list = data.courses.filter((c) => !n || c.title.toLowerCase().includes(n) || c.code.toLowerCase().includes(n));
-  const cats = [...new Set(list.map((c) => c.category))];
+  const cats = [...new Set(data.courses.map((c) => c.category))];
+  const groups = groupCourses(list);
   return (
     <Shell title="Katalog">
       <div className="page-head">
@@ -23,10 +24,10 @@ export default function Catalog() {
         <button className="btn primary" onClick={() => setEditing({ color: 'teal', category: cats[0] ?? 'Lainnya' })}><Icon name="plus" />Mata kuliah</button>
       </div>
       <input className="input" style={{ maxWidth: 320 }} placeholder="Cari mata kuliah" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari mata kuliah" />
-      {cats.map((cat) => (
+      {groups.map(([cat, items]) => (
         <section key={cat} className="card flush">
-          <div className="eyebrow" style={{ padding: '14px 16px 6px' }}>{cat}</div>
-          {list.filter((c) => c.category === cat).map((c) => {
+          <div className="eyebrow" style={{ padding: '14px 16px 6px' }}>{cat} · {items.length}</div>
+          {items.map((c) => {
             const topics = data.topics.filter((t) => t.course_id === c.id);
             const isOpen = open === c.id;
             return (
@@ -36,6 +37,7 @@ export default function Catalog() {
                     <Icon name={isOpen ? 'chevD' : 'chevR'} size={14} />
                     <span className="chip" style={colorVar(c.color)}>{c.code}</span>
                     <span className="strong">{c.title}</span>
+                    <span className="small muted">{c.category}</span>
                     {!c.active && <span className="pill">Nonaktif</span>}
                     <span className="small muted ml-auto">{topics.length} topik · {topics.filter((t) => t.pretest_url && t.posttest_url).length} lengkap tesnya</span>
                   </button>
@@ -95,14 +97,14 @@ function TopicEditor({ course, data }: { course: Course; data: Data }) {
 function CourseForm({ initial, data, onClose }: { initial: Partial<Course>; data: Data; onClose: () => void }) {
   const { busy, run } = useAction();
   const cats = [...new Set(data.courses.map((c) => c.category))];
-  const [f, setF] = useState({ code: initial.code ?? '', title: initial.title ?? '', category: initial.category ?? 'Lainnya', newCat: '', description: initial.description ?? '', color: (initial.color ?? 'teal') as CourseColor, active: initial.active ?? true });
+  const [f, setF] = useState({ code: initial.code ?? '', title: initial.title ?? '', category: initial.category ?? 'Lainnya', newCat: '', description: initial.description ?? '', color: (initial.color ?? 'teal') as CourseColor, active: initial.active ?? true, semester: initial.semester ?? null as number | null, kind: (initial.kind ?? 'wajib') as 'wajib' | 'pilihan' });
   const category = f.category === '__new' ? f.newCat.trim() : f.category;
   const similar = data.courses.find((c) => c.id !== initial.id && c.title.trim().toLowerCase().replace(/\s+/g, ' ') === f.title.trim().toLowerCase().replace(/\s+/g, ' '));
   const valid = f.code.trim() && f.title.trim().length > 1 && category && !similar;
   return (
     <Modal title={initial.id ? 'Ubah mata kuliah' : 'Mata kuliah baru'} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>Batal</button>
-      <button className="btn primary" disabled={!valid || !!busy} onClick={() => run('s', async () => { await saveCourse({ id: initial.id, code: f.code, title: f.title, category, description: f.description.trim(), color: f.color, active: f.active }); onClose(); }, 'Mata kuliah tersimpan.')}>Simpan</button>
+      <button className="btn primary" disabled={!valid || !!busy} onClick={() => run('s', async () => { await saveCourse({ id: initial.id, code: f.code, title: f.title, category, description: f.description.trim(), color: f.color, active: f.active, semester: f.kind === 'pilihan' ? null : f.semester, kind: f.kind }); onClose(); }, 'Mata kuliah tersimpan.')}>Simpan</button>
     </>}>
       <div className="form-grid">
         <Field label="Kode" hint="Unik, dipakai di kode sesi (mis. STI1-0001).">{(id) => <input id={id} className="input" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '') })} />}</Field>
@@ -113,6 +115,14 @@ function CourseForm({ initial, data, onClose }: { initial: Partial<Course>; data
           </select>
         )}</Field>
         {f.category === '__new' ? <Field label="Nama kelompok baru">{(id) => <input id={id} className="input" value={f.newCat} onChange={(e) => setF({ ...f, newCat: e.target.value })} />}</Field> : <div />}
+        <Field label="Jenis">{(id) => (
+          <select id={id} className="select" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'wajib' | 'pilihan' })}><option value="wajib">Wajib</option><option value="pilihan">Pilihan</option></select>
+        )}</Field>
+        <Field label="Semester" hint="Kosongkan untuk mata kuliah umum atau pilihan.">{(id) => (
+          <select id={id} className="select" value={f.semester ?? ''} disabled={f.kind === 'pilihan'} onChange={(e) => setF({ ...f, semester: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">Umum</option>{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>Semester {n}</option>)}
+          </select>
+        )}</Field>
         <Field label="Warna" className="full">{() => (
           <div className="row wrap">
             {COURSE_COLORS.map((c) => <button key={c} type="button" className="btn icon sm" aria-label={c} aria-pressed={f.color === c} onClick={() => setF({ ...f, color: c })} style={{ background: `var(--${c})`, borderColor: f.color === c ? 'var(--ink)' : 'transparent', borderWidth: 2 }} />)}

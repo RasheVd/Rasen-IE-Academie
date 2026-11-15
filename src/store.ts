@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react';
 import { createClient, type EmailOtpType } from '@supabase/supabase-js';
 import {
   defaultSettings, emptyData, type AvailabilityException, type BookingOptions, type Course, type Data, type Enrollment, type Material,
-  type Mode, type Payout, type Profile, type Role, type Rule, type Session, type Settings, type Topic,
+  type Mode, type Payout, type Prefs, type Profile, type Role, type Rule, type Session, type Settings, type SiteContent, type SiteTheme, type Topic,
 } from './domain/types';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -19,7 +19,7 @@ export const SITE = typeof location !== 'undefined' ? location.origin : 'https:/
 type Status = 'booting' | 'signed-out' | 'no-profile' | 'loading' | 'ready' | 'error';
 export interface Toast { id: number; message: string; tone?: 'error' }
 export interface Gcal { configured: boolean; connected: boolean; email: string | null; last_error?: string | null }
-export interface PublicInfo { admin_whatsapp: string; admin_whatsapp_label: string; price_private: number; price_group: number; mentors: number; courses: number }
+export interface PublicInfo { admin_whatsapp: string; admin_whatsapp_label: string; price_private: number; price_group: number; mentors: number; courses: number; theme?: SiteTheme; content?: SiteContent }
 interface Root { status: Status; error: string | null; email: string | null; me: Profile | null; data: Data; gcal: Gcal | null; toasts: Toast[]; info: PublicInfo | null; recovery: boolean }
 
 let root: Root = {
@@ -105,11 +105,12 @@ export async function load(silent = false) {
     const me = ok(await sb.rpc('academie_ensure_profile')) as Profile | null;
     if (!me?.id || !me.active) { set({ status: 'no-profile', me: null }); return; }
     const q = (t: string) => sb.from(`academie_${t}`).select('*');
-    const [settings, profiles, courses, topics, enrollments, mentorCourses, rules, exceptions, sessions, seats, credits, materials, notices, payouts] = await Promise.all([
+    const [settings, profiles, courses, topics, enrollments, mentorCourses, rules, exceptions, sessions, seats, credits, materials, notices, payouts, todos] = await Promise.all([
       q('settings').maybeSingle(), q('profiles').order('full_name'), q('courses').order('category').order('title'), q('topics').order('position'),
       q('enrollments'), q('mentor_courses'), q('availability_rules').order('weekday').order('start_time'), q('availability_exceptions').order('starts_on'),
       q('sessions').order('starts_at'), q('session_students'), q('credits').order('created_at'), q('materials').order('created_at', { ascending: false }),
       q('notifications').order('created_at', { ascending: false }).limit(50), q('payouts').order('month', { ascending: false }),
+      q('todos').eq('profile_id', me.id).order('created_at'),
     ]);
     set({
       status: 'ready', me,
@@ -118,7 +119,7 @@ export async function load(silent = false) {
         profiles: ok(profiles), courses: ok(courses), topics: ok(topics), enrollments: ok(enrollments), mentorCourses: ok(mentorCourses),
         rules: ok(rules), exceptions: ok(exceptions), sessions: ok(sessions), seats: (ok(seats) as any[]).map((x) => ({
           ...x, pretest_score: x.pretest_score == null ? null : Number(x.pretest_score), posttest_score: x.posttest_score == null ? null : Number(x.posttest_score),
-        })), credits: ok(credits), materials: ok(materials), notices: ok(notices), payouts: ok(payouts),
+        })), credits: ok(credits), materials: ok(materials), notices: ok(notices), payouts: ok(payouts), todos: ok(todos),
       } as Data,
     });
     if (!root.gcal) refreshGcal();
@@ -309,3 +310,32 @@ export async function removePayout(id: string) { await del('payouts', id); await
 
 // Pengaturan bisnis (admin)
 export async function saveSettings(patch: Partial<Settings>) { ok(await sb.from('academie_settings').update(patch).eq('id', 1)); await reload(); loadInfo(); }
+
+// Link pretest/posttest sesi (mentor sesi itu atau admin)
+export async function setSessionTests(sessionId: string, pretest: string, posttest: string) {
+  await rpc('set_session_tests', { p_session: sessionId, p_pretest: pretest.trim(), p_posttest: posttest.trim() });
+  syncSession(sessionId); await reload();
+}
+
+// Preferensi pribadi: langsung berlaku di layar, lalu disimpan ke server
+export async function updatePrefs(patch: Prefs) {
+  const me = root.me; if (!me) return;
+  set({ me: { ...me, prefs: { ...(me.prefs ?? {}), ...patch } } });
+  try { await rpc('update_my_prefs', { p: patch }); } catch (e) { toast((e as Error).message, 'error'); }
+}
+
+// To-do pribadi
+export async function addTodo(title: string, due_on: string | null) {
+  ok(await sb.from('academie_todos').insert({ profile_id: root.me!.id, title: title.trim(), due_on })); await reload();
+}
+export async function toggleTodo(id: string, done: boolean) {
+  set({ data: { ...root.data, todos: root.data.todos.map((t) => (t.id === id ? { ...t, done } : t)) } });
+  ok(await sb.from('academie_todos').update({ done }).eq('id', id));
+}
+export async function removeTodo(id: string) { await del('todos', id); await reload(); }
+
+// Katalog untuk halaman depan (terbaca tanpa login)
+export async function publicCourses() {
+  const { data } = await sb.from('academie_courses').select('id, code, title, semester, kind, category').eq('active', true).order('title');
+  return (data ?? []) as Pick<Course, 'id' | 'code' | 'title' | 'semester' | 'kind' | 'category'>[];
+}

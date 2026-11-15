@@ -8,7 +8,7 @@ import { invite, inviteLink, resendInvite, setEnrollment, toast, useData, useMe,
 import { useTitle } from '../../hooks';
 import { shortDate, toLocal } from '../../domain/time';
 import { inviteMessage } from '../../domain/wa';
-import { ROLE_LABEL, type Data, type Profile, type Role } from '../../domain/types';
+import { ROLE_LABEL, groupCourses, type Data, type Profile, type Role } from '../../domain/types';
 
 export default function People({ role }: { role: Role }) {
   const label = role === 'student' ? 'Peserta' : 'Mentor';
@@ -156,15 +156,15 @@ export function CoursePicker({ data, value, onChange }: { data: Data; value: str
   const [q, setQ] = useState('');
   const n = q.trim().toLowerCase();
   const list = data.courses.filter((c) => c.active && (!n || c.title.toLowerCase().includes(n) || c.code.toLowerCase().includes(n)));
-  const cats = [...new Set(list.map((c) => c.category))];
+  const groups = groupCourses(list);
   return (
     <div className="stack sm">
       <input className="input sm" placeholder="Cari mata kuliah" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari mata kuliah" />
       <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 8 }}>
-        {cats.map((cat) => (
-          <div key={cat} style={{ marginBottom: 6 }}>
-            <div className="tiny muted strong">{cat}</div>
-            {list.filter((c) => c.category === cat).map((c) => (
+        {groups.map(([g, items]) => (
+          <div key={g} style={{ marginBottom: 6 }}>
+            <div className="tiny muted strong">{g}</div>
+            {items.map((c) => (
               <label key={c.id} className="check" style={{ padding: '3px 0' }}>
                 <input type="checkbox" checked={value.includes(c.id)} onChange={(e) => onChange(e.target.checked ? [...value, c.id] : value.filter((x) => x !== c.id))} />
                 <span>{c.title} <span className="muted small">{c.code}</span></span>

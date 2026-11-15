@@ -4,6 +4,7 @@ import { ConfirmHost } from './components/ui';
 import { Toasts } from './components/Shell';
 import { Loading } from './components/bits';
 import { auth, load, useStore } from './store';
+import { applyTheme } from './domain/theme';
 import { Landing } from './views/public/Landing';
 import { Privacy, Terms } from './views/public/Legal';
 import { SignIn, SetPassword } from './views/public/Auth';
@@ -16,6 +17,8 @@ const SessionDetail = lazy(() => import('./views/SessionDetail'));
 const Materials = lazy(() => import('./views/Materials'));
 const Account = lazy(() => import('./views/Account'));
 const Earnings = lazy(() => import('./views/Earnings'));
+const MyCalendar = lazy(() => import('./views/MyCalendar'));
+const Workspace = lazy(() => import('./views/Workspace'));
 const MentorHome = lazy(() => import('./views/mentor/MentorHome'));
 const Availability = lazy(() => import('./views/mentor/Availability'));
 const AdminHome = lazy(() => import('./views/admin/AdminHome'));
@@ -34,6 +37,11 @@ export function App() {
   const recovery = useStore((r) => r.recovery);
   const loc = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
+  // Warna situs dari pengaturan admin (sebelum login: dari info publik).
+  const theme = useStore((r) => (r.status === 'ready' ? r.data.settings.theme : r.info?.theme));
+  useEffect(() => applyTheme(theme), [theme]);
+  const density = useStore((r) => r.me?.prefs?.density);
+  useEffect(() => { document.body.classList.toggle('dense', density === 'padat'); }, [density]);
 
   const path = loc.pathname.replace(/\/$/, '') || '/';
   if (path === '/') return <><Landing /><Toasts /></>;
@@ -70,7 +78,9 @@ export function App() {
     <Suspense fallback={<Loading />}>
       <Routes>
         <Route path="/beranda" element={role === 'admin' ? <AdminHome /> : role === 'mentor' ? <MentorHome /> : <StudentHome />} />
+        <Route path="/ruang-kerja" element={<Workspace />} />
         <Route path="/sesi" element={<Sessions />} />
+        {role !== 'admin' && <Route path="/jadwal" element={<MyCalendar />} />}
         <Route path="/sesi/:id" element={<SessionDetail />} />
         <Route path="/materi" element={<Materials />} />
         <Route path="/pengaturan" element={<Account />} />

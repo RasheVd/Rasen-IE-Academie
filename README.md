@@ -8,6 +8,15 @@ Portal les privat mata kuliah Teknik Industri di **academie.my.id**, untuk tiga 
 
 Aturan bisnis dijaga di database, bukan hanya di tampilan: sesi 60 menit, private 1 orang, kelas bersama maks 5, booking paling lambat 24 jam sebelumnya, slot ditahan 12 jam menunggu bukti bayar, pindah jadwal sampai H-1 (kursi lunas jadi kredit), pembatalan mentor memberi kredit otomatis, satu mentor tidak bisa punya dua sesi bertumpuk, peserta tidak hadir tetap dihitung untuk hak mentor.
 
+## Fitur v3 (15 November 2026)
+
+- **Katalog S1 DTSI ITS**: 56 mata kuliah dengan semester (1–8) dan jenis (wajib/pilihan), mengikuti jadwal Gasal 2026/2027. Migrasi: `supabase/migrations/2026-11-15_v3.sql`. Mata kuliah tanpa daftar topik tetap bisa dibooking; topik dibahas bersama mentor.
+- **Kalender** untuk peserta dan mentor (menu Kalender): tampilan Hari, Minggu, Bulan; mini kalender; tombol Hari ini; pintasan `t` `d` `w` `m` `j` `k`; garis waktu sekarang; popover sesi dengan link pretest/posttest. Mentor melihat jam tersedia dan libur, dan bisa klik jam kosong untuk membuka slot.
+- **Link tes oleh mentor**: di halaman sesi, mentor mengisi link Google Form pretest dan posttest untuk sesinya. Kosong berarti memakai link bawaan topik dari katalog.
+- **Ruang kerja** untuk setiap peran: tugas otomatis sesuai peran, to-do pribadi, agenda 7 hari, ringkasan, kontak admin. Kotak bisa diurutkan dan disembunyikan.
+- **Tampilan**: admin memilih preset warna atau warna sendiri, dan mengubah teks halaman depan (Aturan bisnis → Tampilan situs). Tiap orang memilih kepadatan dan tampilan kalender awal (Akun & Google).
+- **Halaman depan** bergaya komik aksi orisinal dengan adegan 3D WebGL (dari starter kit, tanpa aset pihak ketiga), dimuat terpisah. Gambar diam dipakai bila 3D dimatikan admin, perangkat hemat data, atau WebGL tidak tersedia. Pengunjung dengan pengaturan kurangi gerakan melihat adegan diam.
+
 ## Teknologi
 
 React 19, Vite 8, TypeScript 7, react-router 7, Supabase (Postgres + RLS, Auth, Storage, Edge Functions, pg_cron), Google Calendar API. Tanpa server sendiri: situsnya statis, logika ada di database dan dua Edge Function.
@@ -137,6 +146,7 @@ npm test            # uji unit
 
 - `npm test`: 32 uji unit (slot, ambang nilai, hak mentor, WhatsApp, WIB, dan seluruh alur Google Calendar terhadap API tiruan).
 - `e2e/run.mjs`: 34 langkah di browser untuk tiga peran: booking private dan kelas bersama, bergabung ke kelas, upload bukti, konfirmasi admin, kalender induk, mentor batal dengan tombol WA, kredit, pindah jadwal, laporan dan nilai, dasbor IXL, ulasan, hak mentor, undangan, tampilan HP.
+- `e2e/v3.mjs`: 9 langkah untuk fitur v3 (booking tanpa topik, kalender, ruang kerja, link tes, kepadatan, pratinjau warna).
 - `e2e/rls.mjs`: 24 uji keamanan langsung ke API dengan token tiap peran (peserta tidak bisa menandai dirinya lunas, memberi diri kredit, menjadi admin, melihat bukti bayar orang lain, dan seterusnya).
 
 Keduanya butuh akun uji `e2e-admin`, `e2e-mentor`, `e2e-siswa`, `e2e-siswa2` @example.com dengan kata sandi di `E2E_PASSWORD`, dibuat lewat SQL dan dihapus setelah uji (`e2e/cleanup.mjs` untuk file bukti, SQL untuk sisanya). Akun uji tidak ada di database produksi sekarang.

@@ -8,7 +8,7 @@ import { StudentDashboard } from '../student/Dashboard';
 import { grantCredit, saveEnrollment, saveProfile, setCompetency, setEnrollment, useData, useMe } from '../../store';
 import { useTitle } from '../../hooks';
 import { hm, shortDate, toLocal } from '../../domain/time';
-import { ROLE_LABEL, WEEKDAYS, type Data, type Enrollment, type Profile } from '../../domain/types';
+import { ROLE_LABEL, WEEKDAYS, groupCourses, type Data, type Enrollment, type Profile } from '../../domain/types';
 
 export default function PersonDetail() {
   const { id } = useParams();
@@ -60,7 +60,6 @@ function Enrollments({ p, data }: { p: Profile; data: Data }) {
   const [goal, setGoal] = useState<Enrollment | null>(null);
   const [add, setAdd] = useState('');
   const mine = data.enrollments.filter((e) => e.student_id === p.id);
-  const cats = [...new Set(data.courses.filter((c) => c.active).map((c) => c.category))];
   return (
     <section className="card stack">
       <div><div className="h-card">Mata kuliah yang diambil</div><div className="small muted">Peserta hanya bisa booking dan melihat mentor untuk mata kuliah ini.</div></div>
@@ -81,7 +80,7 @@ function Enrollments({ p, data }: { p: Profile; data: Data }) {
       <div className="row wrap">
         <select className="select" style={{ maxWidth: 380 }} value={add} onChange={(e) => setAdd(e.target.value)} aria-label="Tambah mata kuliah">
           <option value="">Tambah mata kuliah…</option>
-          {cats.map((cat) => <optgroup key={cat} label={cat}>{data.courses.filter((c) => c.active && c.category === cat && !mine.some((m) => m.course_id === c.id)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</optgroup>)}
+          {groupCourses(data.courses.filter((c) => c.active && !mine.some((m) => m.course_id === c.id))).map(([g, list]) => <optgroup key={g} label={g}>{list.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</optgroup>)}
         </select>
         <button className="btn" disabled={!add || !!busy} onClick={() => run('a', async () => { await setEnrollment(p.id, add, true); setAdd(''); }, 'Mata kuliah ditambahkan.')}>Tambah</button>
       </div>
@@ -145,7 +144,6 @@ function MentorAdmin({ p, data }: { p: Profile; data: Data }) {
   const [add, setAdd] = useState('');
   const comps = data.mentorCourses.filter((m) => m.mentor_id === p.id);
   const rules = data.rules.filter((r) => r.mentor_id === p.id && r.active).sort((a, b) => ((a.weekday + 6) % 7) - ((b.weekday + 6) % 7) || a.start_min - b.start_min);
-  const cats = [...new Set(data.courses.filter((c) => c.active).map((c) => c.category))];
   return (
     <div className="grid g2">
       <section className="card stack">
@@ -166,7 +164,7 @@ function MentorAdmin({ p, data }: { p: Profile; data: Data }) {
         <div className="row wrap">
           <select className="select" style={{ maxWidth: 300 }} value={add} onChange={(e) => setAdd(e.target.value)} aria-label="Tambah kompetensi">
             <option value="">Tambah mata kuliah…</option>
-            {cats.map((cat) => <optgroup key={cat} label={cat}>{data.courses.filter((c) => c.active && c.category === cat && !comps.some((m) => m.course_id === c.id)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</optgroup>)}
+            {groupCourses(data.courses.filter((c) => c.active && !comps.some((m) => m.course_id === c.id))).map(([g, list]) => <optgroup key={g} label={g}>{list.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</optgroup>)}
           </select>
           <button className="btn" disabled={!add || !!busy} onClick={() => run('n', async () => { await setCompetency(p.id, add, 'approved'); setAdd(''); }, 'Ditambahkan dan disetujui.')}>Tambah</button>
         </div>

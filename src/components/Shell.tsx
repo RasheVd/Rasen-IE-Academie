@@ -11,7 +11,9 @@ const NAV: Record<Role, { group?: string; items: NavItem[] }[]> = {
   student: [{
     items: [
       { to: '/beranda', label: 'Dasbor', icon: 'home' },
+      { to: '/ruang-kerja', label: 'Ruang kerja', icon: 'note' },
       { to: '/booking', label: 'Booking sesi', icon: 'plus' },
+      { to: '/jadwal', label: 'Kalender', icon: 'grid' },
       { to: '/sesi', label: 'Sesi saya', icon: 'calendar', count: (d, me) => d.seats.filter((x) => x.student_id === me && x.payment_status === 'pending' && !x.proof_path).length },
       { to: '/topik', label: 'Topik & nilai', icon: 'target' },
       { to: '/materi', label: 'Materi', icon: 'book' },
@@ -20,6 +22,8 @@ const NAV: Record<Role, { group?: string; items: NavItem[] }[]> = {
   mentor: [{
     items: [
       { to: '/beranda', label: 'Beranda', icon: 'home' },
+      { to: '/ruang-kerja', label: 'Ruang kerja', icon: 'note' },
+      { to: '/jadwal', label: 'Kalender', icon: 'grid' },
       { to: '/sesi', label: 'Sesi', icon: 'calendar', count: (d, me) => d.sessions.filter((s) => s.mentor_id === me && s.status === 'scheduled' && Date.parse(s.ends_at) < Date.now()).length },
       { to: '/ketersediaan', label: 'Ketersediaan', icon: 'clock' },
       { to: '/peserta', label: 'Peserta', icon: 'users' },
@@ -31,6 +35,7 @@ const NAV: Record<Role, { group?: string; items: NavItem[] }[]> = {
     {
       items: [
         { to: '/beranda', label: 'Beranda', icon: 'home' },
+      { to: '/ruang-kerja', label: 'Ruang kerja', icon: 'note' },
         { to: '/kalender', label: 'Kalender induk', icon: 'grid' },
         { to: '/pembayaran', label: 'Pembayaran', icon: 'card', count: (d) => d.seats.filter((x) => x.payment_status === 'pending' && x.proof_path).length },
         { to: '/sesi', label: 'Semua sesi', icon: 'calendar' },

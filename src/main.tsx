@@ -5,7 +5,9 @@ import '@fontsource-variable/plus-jakarta-sans';
 import './styles/app.css';
 import { App } from './App';
 import { boot } from './store';
+import { applyTheme } from './domain/theme';
 
+applyTheme(undefined);
 boot();
 
 createRoot(document.getElementById('root')!).render(

@@ -8,7 +8,7 @@ import { removeException, removeRule, requestCompetency, saveException, saveRule
 import { useTitle } from '../../hooks';
 import { availableSlots } from '../../domain/slots';
 import { hm, longDate, shortDate, toLocal } from '../../domain/time';
-import { WEEKDAYS, type Data, type Profile, type Rule } from '../../domain/types';
+import { WEEKDAYS, groupCourses, type Data, type Profile, type Rule } from '../../domain/types';
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 const MODES: Record<Rule['modes'], string> = { both: 'Private & bersama', private: 'Private saja', group: 'Kelas bersama saja' };
@@ -32,7 +32,6 @@ export function Competencies({ data, me }: { data: Data; me: Profile }) {
   const { busy, run } = useAction();
   const [pick, setPick] = useState('');
   const mine = data.mentorCourses.filter((x) => x.mentor_id === me.id);
-  const categories = [...new Set(data.courses.filter((c) => c.active).map((c) => c.category))];
   return (
     <section className="card stack" id="kompetensi">
       <div className="card-head" style={{ marginBottom: 0 }}><div><div className="h-card">Mata kuliah yang kamu ajar</div><div className="sub">Pilih dari katalog. Peserta melihatmu setelah admin menyetujui.</div></div></div>
@@ -52,10 +51,8 @@ export function Competencies({ data, me }: { data: Data; me: Profile }) {
       <div className="row wrap">
         <select className="select" style={{ maxWidth: 380 }} value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Pilih mata kuliah">
           <option value="">Tambah mata kuliah…</option>
-          {categories.map((cat) => (
-            <optgroup key={cat} label={cat}>
-              {data.courses.filter((c) => c.active && c.category === cat && !mine.some((m) => m.course_id === c.id)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}
-            </optgroup>
+          {groupCourses(data.courses.filter((c) => c.active && !mine.some((m) => m.course_id === c.id))).map(([g, list]) => (
+            <optgroup key={g} label={g}>{list.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</optgroup>
           ))}
         </select>
         <button className="btn" disabled={!pick || !!busy} onClick={() => run('a', async () => { await requestCompetency(me.id, pick); setPick(''); }, 'Diajukan. Admin akan meninjau.')}>Ajukan</button>

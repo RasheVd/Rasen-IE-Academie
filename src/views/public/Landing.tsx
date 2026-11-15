@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import '@fontsource/anton';
 import { Logo, Icon } from '../../components/Icon';
 import { WaButton, prettyPhone } from '../../components/bits';
-import { useStore } from '../../store';
-import { defaultSettings } from '../../domain/types';
+import { publicCourses, useStore } from '../../store';
+import { defaultSettings, groupCourses, type Course } from '../../domain/types';
+import { content, resolveTheme } from '../../domain/theme';
 import { rupiah } from '../../domain/time';
 import { useTitle } from '../../hooks';
 
@@ -14,6 +17,7 @@ export function usePublicInfo() {
     price_private: info?.price_private ?? defaultSettings.price_private,
     price_group: info?.price_group ?? defaultSettings.price_group,
     mentors: info?.mentors ?? null, courses: info?.courses ?? null,
+    theme: info?.theme, content: content(info?.content),
   };
 }
 
@@ -31,10 +35,10 @@ export function PubNav() {
   );
 }
 
-export function PubFoot() {
+export function PubFoot({ dark }: { dark?: boolean }) {
   const info = usePublicInfo();
   return (
-    <footer className="pub-foot">
+    <footer className={`pub-foot ${dark ? 'dark' : ''}`}>
       <div className="in">
         <div>© {new Date().getFullYear()} IE.Academie · Les privat Teknik Industri</div>
         <div className="row wrap" style={{ gap: 16 }}>
@@ -49,14 +53,51 @@ export function PubFoot() {
 
 export function SessionTimeline() {
   const parts = [
-    { t: 'Pretest', m: '0–5', bg: '#5b6b78' },
-    { t: 'Materi & latihan', m: '5–45', bg: '#0f4c45' },
-    { t: 'Pembahasan', m: '45–55', bg: '#0a9488' },
-    { t: 'Posttest', m: '55–60', bg: '#5b6b78' },
+    { t: 'Pretest', m: '0–5', w: 5, key: true },
+    { t: 'Materi dan latihan', m: '5–45', w: 40 },
+    { t: 'Pembahasan', m: '45–55', w: 10 },
+    { t: 'Posttest', m: '55–60', w: 5, key: true },
   ];
   return (
-    <div className="timeline" role="list" aria-label="Susunan satu sesi 60 menit">
-      {parts.map((p) => <div key={p.t} role="listitem" style={{ background: p.bg }} title={`${p.t}, menit ${p.m}`}>{p.t.split(' ')[0]}<span>{p.m}</span></div>)}
+    <div className="lp-timeline" role="list" aria-label="Susunan satu sesi 60 menit">
+      {parts.map((p) => (
+        <div key={p.t} role="listitem" style={{ flexGrow: p.w }} className={p.key ? 'key' : ''}>
+          <b>{p.t}</b><span>menit {p.m}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Adegan 3D, dimuat terpisah. Gambar diam bila 3D dimatikan admin, perangkat hemat data, atau WebGL tidak ada. */
+function Stage({ enabled, accent }: { enabled: boolean; accent: string }) {
+  const stage = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [mode, setMode] = useState<'loading' | '3d' | 'still'>(enabled ? 'loading' : 'still');
+  useEffect(() => {
+    if (!enabled) { setMode('still'); return; }
+    const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
+    if (nav.connection?.saveData || (nav.deviceMemory && nav.deviceMemory <= 2)) { setMode('still'); return; }
+    let stop: (() => void) | null = null, dead = false;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    import('../../landing/scene').then(({ mountScene }) => {
+      if (dead || !canvas.current || !stage.current) return;
+      stop = mountScene(canvas.current, stage.current, { reduced, accent });
+      setMode(stop ? '3d' : 'still');
+    }).catch(() => setMode('still'));
+    return () => { dead = true; stop?.(); };
+  }, [enabled, accent]);
+  return (
+    <div className="lp-stage" ref={stage}>
+      <div className="lp-burst" aria-hidden="true" />
+      {mode !== 'still' && (
+        <canvas ref={canvas} className="lp-canvas" tabIndex={0}
+          aria-label="Ilustrasi 3D buku terbuka dengan pecahan grafis merah, hitam, dan putih. Seret atau pakai tombol panah untuk memutar." />
+      )}
+      {mode === 'still' && <img className="lp-canvas" src="/landing/fallback-scene.svg" alt="Ilustrasi buku terbuka dengan pecahan grafis merah, hitam, dan putih" width={1000} height={900} />}
+      <span className="lp-sticker s1" aria-hidden="true">Kamu pilih jamnya</span>
+      <span className="lp-sticker s2" aria-hidden="true">Nilai per topik</span>
+      {mode === '3d' && <span className="lp-hint" aria-hidden="true">Seret untuk memutar</span>}
     </div>
   );
 }
@@ -64,83 +105,127 @@ export function SessionTimeline() {
 export function Landing() {
   useTitle('');
   const info = usePublicInfo();
-  const signup = 'Halo admin IE.Academie, saya mau daftar les. Nama: \nMata kuliah: \nKampus/angkatan: ';
+  const c = info.content;
+  const accent = resolveTheme(info.theme).accent;
+  const signedIn = useStore((r) => r.status === 'ready');
+  const [courses, setCourses] = useState<Pick<Course, 'id' | 'code' | 'title' | 'semester' | 'kind'>[]>([]);
+  useEffect(() => { publicCourses().then(setCourses).catch(() => {}); }, []);
+  const signup = 'Halo admin IE.Academie, saya mau daftar les.\nNama: \nMata kuliah: \nAngkatan: ';
+  const groups = groupCourses(courses);
+  // Di layar lebar semua semester terbuka; di HP tertutup supaya halaman tidak terlalu panjang.
+  const [wide] = useState(() => typeof window === 'undefined' || window.innerWidth > 700);
+
   return (
-    <div className="pub">
-      <PubNav />
-      <section className="hero">
-        <div className="hero-in">
-          <div>
-            <h1>Les privat Teknik Industri dengan <em>progres yang terukur</em>.</h1>
-            <p className="lead">Pilih mata kuliah, pilih jam dari mentor yang siap mengajarkannya, lalu lihat nilai pretest dan posttest tiap topik naik dari sesi ke sesi.</p>
-            <div className="cta">
-              <WaButton phone={info.admin_whatsapp} text={signup} label="Daftar lewat WhatsApp" />
-              <Link className="btn lg" to="/masuk">Sudah punya akun? Masuk</Link>
-            </div>
-            <p className="small muted" style={{ marginTop: 14 }}>
-              Admin: <b className="num">{prettyPhone(info.admin_whatsapp)}</b> ({info.admin_whatsapp_label})
-            </p>
+    <div className="lp">
+      <a href="#isi" className="sr-only">Lewati ke isi</a>
+      <header className="lp-nav">
+        <Link to="/" className="lp-brand"><Logo /> <span>IE<b>.</b>Academie</span></Link>
+        <nav className="lp-links" aria-label="Bagian halaman">
+          <a href="#cara">Cara kerja</a><a href="#matkul">Mata kuliah</a><a href="#biaya">Biaya</a>
+        </nav>
+        <Link className="lp-btn sm" to={signedIn ? '/beranda' : '/masuk'}>{signedIn ? 'Buka dasbor' : 'Masuk'}</Link>
+      </header>
+
+      <section className="lp-hero">
+        <div className="lp-copy">
+          <p className="lp-tags"><span>60 menit</span><span>maks 5 orang</span><span>pretest + posttest</span></p>
+          <h1 className="lp-h1"><span className="a">{c.hero_title}</span> <span className="b">{c.hero_accent}</span></h1>
+          <p className="lp-lead">{c.hero_lead}</p>
+          <div className="lp-cta">
+            <Link className="lp-btn" to={signedIn ? '/beranda' : '/masuk'}>{c.cta_label}<Icon name="arrowR" size={18} /></Link>
+            <a className="lp-btn ghost" href={`https://wa.me/${info.admin_whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(signup)}`} target="_blank" rel="noreferrer"><Icon name="chat" size={18} />Daftar lewat WhatsApp</a>
           </div>
-          <div className="card stack">
-            <div className="h-card">Satu sesi, 60 menit</div>
+          <a className="lp-skip" href="#isi">Lewati intro <Icon name="arrowDown" size={14} /></a>
+        </div>
+        <Stage enabled={c.intro_3d} accent={accent} />
+      </section>
+
+      <main id="isi">
+        <section id="cara" className="lp-sec paper">
+          <div className="lp-in">
+            <h2 className="lp-h2">Cara kerjanya</h2>
+            <p className="lp-sub">{c.about}</p>
+            <ol className="lp-panels">
+              <li><b className="n">01</b><h3>Admin mendaftarkanmu</h3><p>Kamu menerima email undangan dan membuat kata sandi sendiri. Mata kuliahmu sudah terpasang.</p></li>
+              <li><b className="n">02</b><h3>Pilih jam dan mentor</h3><p>Kamu hanya melihat mentor yang mengajar mata kuliahmu. Booking paling lambat 24 jam sebelum mulai.</p></li>
+              <li><b className="n">03</b><h3>Bayar, lalu masuk kalender</h3><p>Upload bukti transfer. Setelah admin konfirmasi, sesi muncul di Google Calendar-mu dengan lima pengingat.</p></li>
+              <li><b className="n">04</b><h3>Lihat nilaimu naik</h3><p>Mentor mencatat pretest dan posttest. Dasbormu menandai topik yang perlu kamu ulang.</p></li>
+            </ol>
+          </div>
+        </section>
+
+        <section className="lp-sec ink">
+          <div className="lp-in">
+            <h2 className="lp-h2">Satu sesi, 60 menit</h2>
             <SessionTimeline />
-            <p className="small muted">Pretest di awal menunjukkan bagian yang belum dikuasai. Posttest di akhir mengukur hasil sesi. Nilai posttest menentukan status topik di dasbormu.</p>
-            <div className="tiles" style={{ gridTemplateColumns: '1fr', gap: 8 }}>
-              <div className="tile need" style={{ padding: 10 }}><div className="tile-top"><Icon name="alert" size={16} />Perlu konsultasi<span className="ml-auto small">di bawah 60</span></div></div>
-              <div className="tile practice" style={{ padding: 10 }}><div className="tile-top"><Icon name="refresh" size={16} />Sedang dilatih<span className="ml-auto small">60 sampai 79</span></div></div>
-              <div className="tile mastered" style={{ padding: 10 }}><div className="tile-top"><Icon name="check" size={16} />Dikuasai<span className="ml-auto small">80 ke atas</span></div></div>
+            <div className="lp-bands">
+              <div className="need"><b>Di bawah 60</b><span>Perlu konsultasi. Kamu mengulang topiknya, admin siap membantu.</span></div>
+              <div className="practice"><b>60 sampai 79</b><span>Sedang dilatih. Satu sesi lagi biasanya cukup.</span></div>
+              <div className="mastered"><b>80 ke atas</b><span>Dikuasai. Lanjut ke topik berikutnya.</span></div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="pub-section">
-        <h2>Cara kerjanya</h2>
-        <p className="lead">Dari daftar sampai nilai tercatat, semuanya di satu tempat dan langsung masuk Google Calendar.</p>
-        <div className="flow">
-          <div><h3>Admin mendaftarkanmu</h3><p>Kamu menerima email undangan, membuat kata sandi sendiri, dan mata kuliahmu sudah terpasang.</p></div>
-          <div><h3>Pilih jam dan mentor</h3><p>Hanya mentor yang mengajar mata kuliahmu yang tampil. Private atau kelas bersama, paling lambat 24 jam sebelumnya.</p></div>
-          <div><h3>Bayar, lalu masuk kalender</h3><p>Upload bukti transfer. Setelah admin konfirmasi, sesi masuk Google Calendar dengan pengingat 5 hari, 3 hari, 1 hari, 6 jam, dan 1 jam sebelumnya.</p></div>
-          <div><h3>Lihat progresmu</h3><p>Tiap topik berstatus Perlu konsultasi, Sedang dilatih, atau Dikuasai, lengkap dengan saran topik berikutnya.</p></div>
-        </div>
-      </section>
+        <section id="matkul" className="lp-sec paper">
+          <div className="lp-in">
+            <h2 className="lp-h2">Mata kuliah S1 yang bisa kamu ambil</h2>
+            <p className="lp-sub">Daftar mengikuti kurikulum Departemen Teknik Sistem dan Industri ITS. Mata kuliahmu tidak ada? Kabari admin.</p>
+            {groups.length === 0 ? <p className="lp-sub">Memuat daftar…</p> : (
+              <div className="lp-courses">
+                {groups.map(([g, list]) => (
+                  <details key={g} className="lp-cgroup" open={wide}>
+                    <summary><h3>{g}</h3><span className="cnt">{list.length} mata kuliah</span></summary>
+                    <ul>{list.map((x) => <li key={x.id}><span className="code">{x.code}</span>{x.title}</li>)}</ul>
+                  </details>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
-      <section className="pub-section" style={{ paddingTop: 0 }}>
-        <h2>Biaya per sesi</h2>
-        <p className="lead">{info.courses ? `${info.courses} mata kuliah Teknik Industri` : 'Mata kuliah Teknik Industri'}{info.mentors ? ` dengan ${info.mentors} mentor` : ''}. Tanpa paket wajib, bayar per sesi.</p>
-        <div className="grid g2">
-          <div className="price-card">
-            <div className="h-card">Private</div>
-            <div className="p num">{rupiah(info.price_private)}</div>
-            <div className="muted small">per sesi 60 menit, 1 peserta</div>
-            <ul><li>Materi mengikuti kebutuhanmu</li><li>Pretest dan posttest per topik</li><li>Laporan sesi dari mentor</li></ul>
+        <section className="lp-sec red">
+          <div className="lp-in lp-two">
+            <div>
+              <h2 className="lp-h2">Untuk peserta</h2>
+              <ul className="lp-list">
+                <li>Kamu pilih mata kuliah, topik, dan jam sendiri.</li>
+                <li>Pindah jadwal sendiri sampai H-1. Pembayaranmu ikut pindah.</li>
+                <li>Kalender, tugas, dan to-do-mu ada di satu ruang kerja.</li>
+              </ul>
+            </div>
+            <div>
+              <h2 className="lp-h2">Untuk mentor</h2>
+              <ul className="lp-list">
+                <li>Kamu isi jam kosong sekali. Peserta booking sendiri.</li>
+                <li>Sesi masuk kalender lengkap dengan nama peserta dan link tes.</li>
+                <li>Laporan sesi cukup lima menit. Rekap hak tersedia tiap bulan.</li>
+              </ul>
+            </div>
           </div>
-          <div className="price-card">
-            <div className="h-card">Kelas bersama</div>
-            <div className="p num">{rupiah(info.price_group)}</div>
-            <div className="muted small">per orang per sesi, maksimal 5 peserta</div>
-            <ul><li>Bisa membuka kelas atau bergabung ke kelas yang sudah dibuka</li><li>Terbuka untuk peserta mata kuliah yang sama</li><li>Pretest dan posttest tetap per orang</li></ul>
-          </div>
-        </div>
-        <div className="banner info" style={{ marginTop: 16 }}>
-          <Icon name="info" size={18} className="ic" />
-          <div className="grow">
-            <div>Aturan jadwal</div>
-            <p>Booking paling lambat 24 jam sebelum sesi. Pindah jadwal sendiri paling lambat H-1; uang tidak dikembalikan, tetapi kursimu berubah jadi kredit untuk sesi lain. Bila mentor membatalkan, kamu otomatis mendapat kredit.</p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="pub-section" style={{ paddingTop: 0 }}>
-        <div className="card row wrap between" style={{ padding: 24 }}>
-          <div className="stack sm">
-            <div className="h-section">Ada pertanyaan sebelum daftar?</div>
-            <p className="muted">Hubungi admin {info.admin_whatsapp_label} di <b className="num">{prettyPhone(info.admin_whatsapp)}</b>.</p>
+        <section id="biaya" className="lp-sec paper">
+          <div className="lp-in">
+            <h2 className="lp-h2">Biaya per sesi</h2>
+            <div className="lp-prices">
+              <div><h3>Private</h3><p className="p">{rupiah(info.price_private)}</p><p className="lp-sub">Kamu dan mentor, 60 menit.</p></div>
+              <div><h3>Kelas bersama</h3><p className="p">{rupiah(info.price_group)}</p><p className="lp-sub">Per orang, sampai 5 peserta dari mata kuliah yang sama.</p></div>
+            </div>
+            <p className="lp-sub">Booking paling lambat 24 jam sebelum sesi. Pindah jadwal sampai H-1 tanpa biaya; uang yang sudah dibayar menjadi kredit, tidak dikembalikan tunai.</p>
           </div>
-          <WaButton phone={info.admin_whatsapp} text="Halo admin IE.Academie, saya mau tanya soal les." label="Chat di WhatsApp" />
-        </div>
-      </section>
-      <PubFoot />
+        </section>
+
+        <section className="lp-sec ink">
+          <div className="lp-in lp-contact">
+            <div>
+              <h2 className="lp-h2">Ada pertanyaan?</h2>
+              <p className="lp-sub">Chat admin {info.admin_whatsapp_label} di <b>{prettyPhone(info.admin_whatsapp)}</b>.</p>
+            </div>
+            <WaButton phone={info.admin_whatsapp} text="Halo admin IE.Academie, saya mau tanya soal les." label="Chat di WhatsApp" />
+          </div>
+        </section>
+      </main>
+      <PubFoot dark />
     </div>
   );
 }

@@ -3,7 +3,8 @@ import { Shell } from '../components/Shell';
 import { Field } from '../components/ui';
 import { GoogleCard } from '../components/google';
 import { AdminContact, useAction } from '../components/bits';
-import { auth, updateMyProfile, useData, useMe } from '../store';
+import { auth, updateMyProfile, updatePrefs, useData, useMe } from '../store';
+import { Link } from 'react-router-dom';
 import { useTitle } from '../hooks';
 import { ROLE_LABEL } from '../domain/types';
 
@@ -43,6 +44,22 @@ export default function Account() {
           )}
         </div>
         <button className="btn primary" style={{ justifySelf: 'start' }} disabled={!dirty || !!busy} onClick={() => run('p', () => updateMyProfile(f), 'Profil tersimpan.')}>Simpan profil</button>
+      </section>
+      <section className="card stack">
+        <div className="h-card">Tampilan untukmu</div>
+        <div className="row wrap between">
+          <div><div className="strong small">Kepadatan</div><div className="small muted">Padat menampilkan lebih banyak isi di layar kecil.</div></div>
+          <div className="seg" role="group" aria-label="Kepadatan tampilan">
+            {(['nyaman', 'padat'] as const).map((d) => <button key={d} aria-pressed={(me.prefs?.density ?? 'nyaman') === d} onClick={() => updatePrefs({ density: d })}>{d === 'nyaman' ? 'Nyaman' : 'Padat'}</button>)}
+          </div>
+        </div>
+        <div className="row wrap between">
+          <div><div className="strong small">Tampilan kalender awal</div><div className="small muted">Bisa diganti juga dengan tombol d, w, m di halaman kalender.</div></div>
+          <div className="seg" role="group" aria-label="Tampilan kalender awal">
+            {(['day', 'week', 'month'] as const).map((v) => <button key={v} aria-pressed={(me.prefs?.calendar_view ?? 'week') === v} onClick={() => updatePrefs({ calendar_view: v })}>{v === 'day' ? 'Hari' : v === 'week' ? 'Minggu' : 'Bulan'}</button>)}
+          </div>
+        </div>
+        <Link to="/ruang-kerja" className="small">Atur isi ruang kerja</Link>
       </section>
       <section className="card stack">
         <div className="h-card">Kata sandi</div>
