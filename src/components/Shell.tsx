@@ -11,6 +11,7 @@ const NAV: Record<Role, { group?: string; items: NavItem[] }[]> = {
   student: [{
     items: [
       { to: '/beranda', label: 'Dasbor', icon: 'home' },
+      { to: '/kelas', label: 'Kelasku', icon: 'layers' },
       { to: '/ruang-kerja', label: 'Ruang kerja', icon: 'note' },
       { to: '/booking', label: 'Booking sesi', icon: 'plus' },
       { to: '/jadwal', label: 'Kalender', icon: 'grid' },
@@ -46,6 +47,7 @@ const NAV: Record<Role, { group?: string; items: NavItem[] }[]> = {
       items: [
         { to: '/peserta', label: 'Peserta', icon: 'users' },
         { to: '/mentor', label: 'Mentor', icon: 'user', count: (d) => d.mentorCourses.filter((x) => x.status === 'pending').length },
+        { to: '/ketersediaan', label: 'Jam mentor', icon: 'clock' },
       ],
     },
     {
@@ -55,6 +57,12 @@ const NAV: Record<Role, { group?: string; items: NavItem[] }[]> = {
         { to: '/materi', label: 'Materi', icon: 'book', count: (d) => d.materials.filter((m) => m.status === 'pending').length },
         { to: '/hak', label: 'Hak mentor', icon: 'wallet' },
         { to: '/pengaturan/bisnis', label: 'Aturan bisnis', icon: 'settings' },
+      ],
+    },
+    {
+      group: 'Sistem',
+      items: [
+        { to: '/data', label: 'Pusat data', icon: 'shield' },
       ],
     },
   ],

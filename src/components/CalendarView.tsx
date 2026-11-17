@@ -10,7 +10,7 @@ import { Icon } from './Icon';
 import { useNow } from '../hooks';
 import { addDays, dayShort, hm, longDate, mondayOf, monthLabel, shortDate, toLocal, weekdayOf } from '../domain/time';
 
-export type CalView = 'day' | 'week' | 'month';
+export type CalView = 'day' | 'week' | 'month' | 'table';
 export interface CalEvent {
   id: string; start: string; end: string; title: string; sub?: string;
   color: string;            // nilai CSS, mis. 'var(--teal)'
@@ -18,6 +18,7 @@ export interface CalEvent {
   dashed?: boolean;         // menunggu bayar
   detail?: ReactNode;       // isi popover tambahan
   to?: string;              // tautan detail
+  badge?: { text: string; tone: 'ok' | 'warn' | 'bad' }; // kursi kelas bersama
 }
 /** Blok latar (jam tersedia, libur) per tanggal WIB. */
 export interface CalBlock { date: string; from: number; to: number; label: string; kind: 'free' | 'off' }
@@ -25,10 +26,12 @@ export interface CalBlock { date: string; from: number; to: number; label: strin
 const HOUR_PX = 48;
 const FIRST_HOUR = 6, LAST_HOUR = 24;
 
-export function CalendarView({ events, blocks = [], view, onView, onSlot, slotHint, toolbarExtra, sideExtra }: {
+export function CalendarView({ events, blocks = [], view: wanted, onView, onSlot, slotHint, toolbarExtra, sideExtra, table }: {
   events: CalEvent[]; blocks?: CalBlock[]; view: CalView; onView: (v: CalView) => void;
   onSlot?: (date: string, min: number) => void; slotHint?: string; toolbarExtra?: ReactNode; sideExtra?: ReactNode;
+  table?: ReactNode;        // isi tampilan Tabel (spreadsheet)
 }) {
+  const view: CalView = wanted === 'table' && !table ? 'week' : wanted;
   const now = useNow();
   const today = toLocal(now).date;
   const [cursor, setCursor] = useState(today);
@@ -59,6 +62,7 @@ export function CalendarView({ events, blocks = [], view, onView, onSlot, slotHi
       else if (k === 'd') onView('day');
       else if (k === 'w') onView('week');
       else if (k === 'm') onView('month');
+      else if (k === 'l' && table) onView('table');
       else if (k === 'j' || k === 'n') step(1);
       else if (k === 'k' || k === 'p') step(-1);
       else if (k === 'escape') setOpen(null);
@@ -85,12 +89,22 @@ export function CalendarView({ events, blocks = [], view, onView, onSlot, slotHi
     setOpen({ ev, x: r.right + 8, y: r.top });
   };
 
+  if (view === 'table') return (
+    <div className="gc-main gc-tablemode">
+      <div className="gc-bar">
+        <h2 className="gc-title">Tabel sesi</h2>
+        <div className="ml-auto row wrap">{toolbarExtra}<ViewSeg view={view} onView={onView} table /></div>
+      </div>
+      <div style={{ padding: 14 }}>{table}</div>
+    </div>
+  );
+
   return (
     <div className="gc">
       <aside className="gc-side">
         <MiniMonth value={cursor} today={today} marked={byDate} onPick={(d) => { setCursor(d); if (view === 'month') onView('day'); }} />
         {sideExtra}
-        <div className="gc-keys tiny muted">Pintasan: <kbd>t</kbd> hari ini · <kbd>d</kbd> <kbd>w</kbd> <kbd>m</kbd> tampilan · <kbd>j</kbd> <kbd>k</kbd> maju/mundur</div>
+        <div className="gc-keys tiny muted">Pintasan: <kbd>t</kbd> hari ini · <kbd>d</kbd> <kbd>w</kbd> <kbd>m</kbd>{table ? <> <kbd>l</kbd></> : null} tampilan · <kbd>j</kbd> <kbd>k</kbd> maju/mundur</div>
       </aside>
       <div className="gc-main">
         <div className="gc-bar">
@@ -100,9 +114,7 @@ export function CalendarView({ events, blocks = [], view, onView, onSlot, slotHi
           <h2 className="gc-title" aria-live="polite">{title}</h2>
           <div className="ml-auto row wrap">
             {toolbarExtra}
-            <div className="seg" role="group" aria-label="Tampilan">
-              {(['day', 'week', 'month'] as CalView[]).map((v) => <button key={v} aria-pressed={view === v} onClick={() => onView(v)}>{v === 'day' ? 'Hari' : v === 'week' ? 'Minggu' : 'Bulan'}</button>)}
-            </div>
+            <ViewSeg view={view} onView={onView} table={!!table} />
           </div>
         </div>
         {view === 'month'
@@ -112,6 +124,14 @@ export function CalendarView({ events, blocks = [], view, onView, onSlot, slotHi
       {open && <Popover ev={open.ev} x={open.x} y={open.y} onClose={() => setOpen(null)} />}
     </div>
   );
+}
+
+/** Label kursi ringkas untuk blok kecil: "PENUH", "sisa 1", atau "3/5". Teks lengkap ada di popover. */
+const compactBadge = (b: NonNullable<CalEvent['badge']>) => b.tone === 'bad' ? 'PENUH' : b.tone === 'warn' ? (b.text.split(' · ')[1] ?? b.text).replace(' kursi', '') : b.text.split(' · ')[0];
+
+function ViewSeg({ view, onView, table }: { view: CalView; onView: (v: CalView) => void; table?: boolean }) {
+  const list: [CalView, string][] = [['day', 'Hari'], ['week', 'Minggu'], ['month', 'Bulan'], ...(table ? [['table', 'Tabel']] as [CalView, string][] : [])];
+  return <div className="seg" role="group" aria-label="Tampilan">{list.map(([v, l]) => <button key={v} aria-pressed={view === v} onClick={() => onView(v)}>{l}</button>)}</div>;
 }
 
 function MiniMonth({ value, today, marked, onPick }: { value: string; today: string; marked: Map<string, CalEvent[]>; onPick: (d: string) => void }) {
@@ -193,7 +213,7 @@ function TimeGrid({ days, today, now, byDate, blocks, onEvent, onSlot, slotHint,
                   <button key={ev.id} className={`gc-ev ${ev.faded ? 'faded' : ''} ${ev.dashed ? 'dashed' : ''}`}
                     style={{ top: y(s), height: Math.max(22, y(e) - y(s) - 2), left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)`, ['--ev' as string]: ev.color }}
                     onClick={(x) => onEvent(ev, x)} aria-label={`${ev.title}, ${hm(s)} sampai ${hm(e)}`}>
-                    <b>{ev.title}</b><span>{hm(s)}–{hm(e)}{ev.sub ? ` · ${ev.sub}` : ''}</span>
+                    <b>{ev.badge && <em className={`gc-badge ${ev.badge.tone}`}>{compactBadge(ev.badge)}</em>}{ev.title}</b><span>{hm(s)}–{hm(e)}{ev.sub ? ` · ${ev.sub}` : ''}</span>
                   </button>
                 );
               })}
@@ -220,7 +240,7 @@ function MonthGrid({ days, cursor, today, byDate, onDay, onEvent }: {
             <button className={`gc-mnum ${d === today ? 'today' : ''}`} onClick={() => onDay(d)} aria-label={longDate(d)}>{Number(d.slice(8))}</button>
             {list.slice(0, 3).map((ev) => (
               <button key={ev.id} className={`gc-chip ${ev.faded ? 'faded' : ''}`} style={{ ['--ev' as string]: ev.color }} onClick={(e) => onEvent(ev, e)}>
-                <i aria-hidden="true" />{hm(toLocal(ev.start).min)} {ev.title}
+                <i aria-hidden="true" />{hm(toLocal(ev.start).min)} {ev.title}{ev.badge && ev.badge.tone !== 'ok' && <em className={`gc-badge ${ev.badge.tone}`}>{compactBadge(ev.badge)}</em>}
               </button>
             ))}
             {list.length > 3 && <button className="gc-more" onClick={() => onDay(d)}>{list.length - 3} lagi</button>}
@@ -256,6 +276,7 @@ function Popover({ ev, x, y, onClose }: { ev: CalEvent; x: number; y: number; on
       <div className="h-card">{ev.title}</div>
       <div className="small muted">{longDate(s.date)} · {hm(s.min)}–{hm(e.min)} WIB</div>
       {ev.sub && <div className="small">{ev.sub}</div>}
+      {ev.badge && <span className={`seat ${ev.badge.tone}`} style={{ justifySelf: 'start' }}>{ev.badge.tone !== 'ok' && <Icon name="alert" size={11} />}{ev.badge.text}</span>}
       {ev.detail}
       {ev.to && <Link className="btn sm primary" to={ev.to} onClick={onClose}>Buka detail</Link>}
     </div>

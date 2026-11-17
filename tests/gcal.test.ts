@@ -88,6 +88,21 @@ describe('slot biru berulang', () => {
     expect(second.r1).toEqual([first.r1[0]]);
     expect(g.get('cal', first.r1[1].id).recurrence[0]).toBe('RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20261114T000000Z');
   });
+  it('menghormati masa berlaku: mulai tanggal, UNTIL, dan judul jenis kelas', async () => {
+    const g = new FakeGoogle();
+    const map = await syncRules(g.gc(), 'cal', [rule({ modes: 'group', valid_from: '2026-11-20', valid_until: '2026-12-31' })], '2026-11-14', new Date('2026-11-14T00:00:00Z'));
+    const ev = g.get('cal', map.r1[0].id);
+    expect(ev.start.dateTime).toBe('2026-11-24T19:00:00');
+    expect(ev.recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20261231T165959Z']);
+    expect(ev.summary).toBe('Tersedia (Kelas bersama) · IE.Academie');
+    // Tanggal akhir diubah: acara lama dihentikan, acara baru dibuat.
+    const again = await syncRules(g.gc(), 'cal', [rule({ modes: 'group', valid_from: '2026-11-20', valid_until: '2027-01-31', gcal_events: map.r1 })], '2026-11-14', new Date('2026-11-14T00:00:00Z'));
+    expect(again.r1[0].id).not.toBe(map.r1[0].id);
+    expect(g.get('cal', map.r1[0].id).recurrence[0]).toContain('UNTIL=20261114T000000Z');
+    // Pola yang sudah berakhir tidak membuat acara.
+    const ended = await syncRules(g.gc(), 'cal', [rule({ valid_from: '2026-10-01', valid_until: '2026-11-01' })], '2026-11-14', new Date('2026-11-14T00:00:00Z'));
+    expect(ended.r1).toEqual([]);
+  });
   it('pola nonaktif menghentikan semua acaranya', async () => {
     const g = new FakeGoogle();
     const first = await syncRules(g.gc(), 'cal', [rule()], '2026-11-14', new Date('2026-11-14T00:00:00Z'));

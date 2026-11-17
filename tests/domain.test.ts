@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availableSlots, groupByDate } from '../src/domain/slots';
+import { availableSlots, bookable, groupByDate, ruleValidOn, seatInfo } from '../src/domain/slots';
 import { courseProgress, recentActivity, stateMessage, stateOf, topicProgress, weeklyActivity, averageGain } from '../src/domain/mastery';
 import { earnings } from '../src/domain/money';
 import { normalizePhone, prettyPhone, waLink, cancelMessage } from '../src/domain/wa';
@@ -70,6 +70,37 @@ describe('slot booking', () => {
     expect(availableSlots(opts({ sessions: [sess(1, C, false)] }), { ...base, mode: 'group', mentorId: M1 }).some((x) => x.starts_at === start)).toBe(false);
     expect(availableSlots(opts({ sessions: [sess(1)] }), { ...base, mode: 'private', mentorId: M1 }).some((x) => x.starts_at === start)).toBe(false);
   });
+  it('slot penuh, tertutup, dan terisi tetap tampil bila diminta, tetapi tidak bisa dibooking', () => {
+    const start = fromLocal('2026-11-16', 1140).toISOString();
+    const sess = (seats: number, open = true, mode: 'group' | 'private' = 'group') => ({ id: 'g', mentor_id: M1, course_id: C, topic_id: null, starts_at: start, ends_at: fromLocal('2026-11-16', 1200).toISOString(), mode, is_open: open, seats });
+    const at = (o: BookingOptions, mode: 'group' | 'private') => availableSlots(o, { ...base, mode, mentorId: M1, includeTaken: true }).find((x) => x.starts_at === start);
+    expect(at(opts({ sessions: [sess(5)] }), 'group')).toMatchObject({ state: 'full', seats: 5 });
+    expect(at(opts({ sessions: [sess(2, false)] }), 'group')).toMatchObject({ state: 'closed' });
+    expect(at(opts({ sessions: [sess(1, false, 'private')] }), 'group')).toMatchObject({ state: 'taken', takenMode: 'private' });
+    expect(at(opts({ sessions: [sess(3)] }), 'private')).toMatchObject({ state: 'taken', takenMode: 'group' });
+    expect(bookable(at(opts({ sessions: [sess(5)] }), 'group')!)).toBe(false);
+    expect(bookable(at(opts({ sessions: [sess(4)] }), 'group')!)).toBe(true);
+  });
+  it('pola hanya berlaku di dalam masa berlakunya, termasuk jadwal sekali', () => {
+    const r = { mentor_id: M1, weekday: 1, start_min: 19 * 60, end_min: 20 * 60, modes: 'private' as const };
+    const dates = (rule: object) => availableSlots(opts({ rules: [{ ...r, ...rule }] }), { ...base, mode: 'private', mentorId: M1 }).map((x) => x.date);
+    expect(dates({})).toEqual(['2026-11-16', '2026-11-23']);
+    expect(dates({ valid_until: '2026-11-20' })).toEqual(['2026-11-16']);
+    expect(dates({ valid_from: '2026-11-20' })).toEqual(['2026-11-23']);
+    expect(dates({ valid_from: '2026-11-23', valid_until: '2026-11-23' })).toEqual(['2026-11-23']);
+    expect(ruleValidOn({ valid_from: '2026-11-01', valid_until: null }, '2027-01-01')).toBe(true);
+  });
+  it('slot membawa jenis, status kelas bersama, dan tempat dari pola mentor', () => {
+    const s = availableSlots(opts({ rules: [{ mentor_id: M1, weekday: 1, start_min: 19 * 60, end_min: 20 * 60, modes: 'group', group_open: false, place_kind: 'diskusi' }] }), { ...base, mode: 'group', mentorId: M1 });
+    expect(s[0]).toMatchObject({ state: 'free', modes: 'group', group_open: false, place_kind: 'diskusi' });
+    expect(availableSlots(opts({ rules: [{ mentor_id: M1, weekday: 1, start_min: 19 * 60, end_min: 20 * 60, modes: 'group' }] }), { ...base, mode: 'private', mentorId: M1 })).toEqual([]);
+  });
+  it('label sisa kursi kelas bersama', () => {
+    expect(seatInfo(1)).toMatchObject({ left: 4, tone: 'ok', text: '1/5 · sisa 4 kursi' });
+    expect(seatInfo(3)).toMatchObject({ left: 2, tone: 'warn' });
+    expect(seatInfo(4)).toMatchObject({ left: 1, tone: 'warn', text: '4/5 · sisa 1 kursi' });
+    expect(seatInfo(5)).toMatchObject({ left: 0, tone: 'bad', text: 'Penuh 5/5' });
+  });
   it('mengelompokkan per tanggal', () => {
     const g = groupByDate(availableSlots(opts(), { ...base, mode: 'private' }));
     expect(g[0].date).toBe('2026-11-16');
@@ -79,7 +110,7 @@ describe('slot booking', () => {
 
 function data(sessions: Partial<Session>[], seats: Partial<Seat>[]): Data {
   const S = (p: Partial<Session>): Session => ({
-    id: 'x', code: 'X', course_id: C, topic_id: null, mentor_id: M1, starts_at: '', ends_at: '', duration_min: 60, mode: 'private', is_open: false, place: '',
+    id: 'x', code: 'X', course_id: C, topic_id: null, mentor_id: M1, starts_at: '', ends_at: '', duration_min: 60, mode: 'private', is_open: false, place: '', place_kind: 'online',
     status: 'done', pretest_url: '', posttest_url: '', report: '', followup: '', reported_at: null, mentor_ready_at: null, cancelled_reason: '',
     cancelled_by: null, cancelled_at: null, created_by: null, gcal_event_id: null, gcal_dirty: false, gcal_error: null, created_at: '', ...p,
   });

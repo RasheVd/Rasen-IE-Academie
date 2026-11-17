@@ -38,7 +38,7 @@ let sessionId = '';
     await page.getByText('Semester 5').first().waitFor();
     await page.getByLabel('Topik yang mau dipelajari').waitFor();
     if (await page.getByLabel('Topik yang mau dipelajari').inputValue() !== 'Dibahas bersama mentor') throw new Error('topik tidak opsional');
-    await page.locator('.slot').first().click();
+    await page.locator('button.slot').first().click();
     await page.getByRole('dialog').getByRole('button', { name: /Booking/ }).click();
     await page.waitForURL(/\/sesi\//, { timeout: 20000 });
     sessionId = page.url().split('/sesi/')[1].split('?')[0];
@@ -50,8 +50,14 @@ let sessionId = '';
     await page.locator('.gc-month').waitFor();
     let tries = 0;
     while (!(await page.locator('.gc-chip').count()) && tries++ < 3) await page.keyboard.press('j');
-    await page.locator('.gc-chip').first().click();
-    await page.locator('.gc-pop').getByText('Menunggu pembayaran').or(page.locator('.gc-pop').getByText('Belum dibayar')).first().waitFor();
+    // Cari acara yang belum dibayar (peserta uji bisa punya sesi lain yang sudah lunas).
+    let found = false;
+    for (let i = 0; i < await page.locator('.gc-chip').count() && !found; i++) {
+      await page.locator('.gc-chip').nth(i).click();
+      found = await page.locator('.gc-pop').getByText(/Belum dibayar|Menunggu konfirmasi bayar/).first().isVisible({ timeout: 1500 }).catch(() => false);
+      if (!found) await page.keyboard.press('Escape');
+    }
+    if (!found) throw new Error('tidak ada acara menunggu pembayaran di popover');
     await page.screenshot({ path: 'e2e/screenshots/v3-01-kalender-bulan-peserta.png' });
     await page.keyboard.press('Escape');
     await page.keyboard.press('w');
@@ -91,6 +97,8 @@ let sessionId = '';
   const { ctx, page } = await as('mentor');
   await step('kalender mentor: jam tersedia, libur, buka slot dari kalender', page, async () => {
     await page.goto(base + '/jadwal');
+    await page.locator('.gc-main').waitFor();
+    await page.keyboard.press('w');
     await page.locator('.gc-time').waitFor();
     if (!(await page.locator('.gc-block.free').count())) throw new Error('jam tersedia tidak tampil');
     await page.screenshot({ path: 'e2e/screenshots/v3-03-kalender-minggu-mentor.png' });
@@ -101,11 +109,13 @@ let sessionId = '';
     for (let h = 13; h <= 21 && !opened; h++) {
       const b = await col.boundingBox();
       await page.mouse.click(b.x + b.width / 2, b.y + (h - 6) * 48 + 20);
-      opened = await page.getByRole('dialog').getByRole('button', { name: 'Buka slot' }).isVisible({ timeout: 800 }).catch(() => false);
+      opened = await page.getByRole('dialog', { name: 'Buka jam mengajar' }).isVisible({ timeout: 800 }).catch(() => false);
     }
     if (!opened) throw new Error('tidak ada jam kosong yang bisa dibuka');
-    await page.getByRole('dialog').getByRole('button', { name: 'Buka slot' }).click();
-    await toast(page, /Slot dibuka/);
+    const dlg = page.getByRole('dialog', { name: 'Buka jam mengajar' });
+    await dlg.getByRole('button', { name: /Private atau bersama/ }).click();
+    await dlg.getByRole('button', { name: 'Simpan' }).click();
+    await toast(page, /Jam tersimpan/);
   });
   await step('mentor mengisi link pretest dan posttest', page, async () => {
     await page.goto(base + '/sesi/' + sessionId);

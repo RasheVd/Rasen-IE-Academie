@@ -49,7 +49,14 @@ export function instanceId(eventId: string, startUtc: Date): string {
 }
 
 /* ── Pola ketersediaan ───────────────────────────────────── */
-export interface Rule { id: string; weekday: number; start_min: number; end_min: number; active: boolean; gcal_events: { start_min: number; id: string }[] }
+export interface Rule {
+  id: string; weekday: number; start_min: number; end_min: number; active: boolean;
+  modes?: 'private' | 'group' | 'both'; valid_from?: string; valid_until?: string | null;
+  gcal_events: { start_min: number; id: string; from?: string; until?: string | null }[];
+}
+const MODE_TEXT = { private: 'Private', group: 'Kelas bersama', both: 'Private/bersama' } as const;
+/** Batas akhir RRULE: 23.59.59 WIB pada tanggal itu, dalam UTC. */
+export const untilUtc = (date: string) => `${date.replace(/-/g, '')}T165959Z`;
 
 export function slotStarts(rule: Pick<Rule, 'start_min' | 'end_min'>): number[] {
   const out: number[] = [];
@@ -62,6 +69,7 @@ export function findSlotEvent(rules: Rule[], startUtc: Date): string | null {
   const l = toLocal(startUtc);
   for (const r of rules) {
     if (!r.active || r.weekday !== l.weekday) continue;
+    if ((r.valid_from && l.date < r.valid_from) || (r.valid_until && l.date > r.valid_until)) continue;
     const e = r.gcal_events.find((x) => x.start_min === l.min);
     if (e && slotStarts(r).includes(l.min)) return e.id;
   }
@@ -101,8 +109,8 @@ const enc = encodeURIComponent;
 const isGone = (e: unknown) => e instanceof GoogleError && (e.status === 404 || e.status === 410);
 
 /* ── Slot biru berulang ──────────────────────────────────── */
-const availableBody = () => ({
-  summary: 'Tersedia · IE.Academie',
+const availableBody = (r?: Pick<Rule, 'modes'>) => ({
+  summary: `Tersedia${r?.modes ? ` (${MODE_TEXT[r.modes]})` : ''} · IE.Academie`,
   description: 'Slot terbuka untuk booking peserta IE.Academie. Berubah merah otomatis saat ada peserta yang booking.',
   colorId: COLOR.available, transparency: 'transparent', attendees: [],
   reminders: { useDefault: false, overrides: [] },
@@ -117,23 +125,27 @@ export async function syncRules(gc: Gcal, calendarId: string, rules: Rule[], tod
   const out: Record<string, Rule['gcal_events']> = {};
   const until = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   for (const r of rules) {
-    const want = r.active ? slotStarts(r) : [];
+    const ended = !!r.valid_until && r.valid_until < today;
+    const want = r.active && !ended ? slotStarts(r) : [];
     const keep: Rule['gcal_events'] = [];
     for (const e of r.gcal_events) {
-      if (want.includes(e.start_min)) { keep.push(e); continue; }
+      const sameRange = (e.from === undefined || e.from === r.valid_from) && (e.until ?? null) === (r.valid_until ?? null);
+      if (want.includes(e.start_min) && sameRange) { keep.push(e); continue; }
       try { await gc.patch(calendarId, e.id, { recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${BYDAY[r.weekday]};UNTIL=${until}`] }); }
       catch (err) { if (!isGone(err)) throw err; }
     }
     for (const m of want) {
       if (keep.some((e) => e.start_min === m)) continue;
-      const date = firstDateOnWeekday(r.weekday, today);
+      const from = r.valid_from && r.valid_from > today ? r.valid_from : today;
+      const date = firstDateOnWeekday(r.weekday, from);
+      if (r.valid_until && date > r.valid_until) continue;
       const ev = await gc.insert(calendarId, {
-        ...availableBody(),
+        ...availableBody(r),
         start: { dateTime: `${date}T${hm(m)}:00`, timeZone: TZ },
         end: { dateTime: `${date}T${hm(m + SLOT_MIN)}:00`, timeZone: TZ },
-        recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${BYDAY[r.weekday]}`],
+        recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${BYDAY[r.weekday]}${r.valid_until ? `;UNTIL=${untilUtc(r.valid_until)}` : ''}`],
       });
-      keep.push({ start_min: m, id: ev.id });
+      keep.push({ start_min: m, id: ev.id, from: r.valid_from, until: r.valid_until ?? null });
     }
     out[r.id] = keep.sort((a, b) => a.start_min - b.start_min);
   }
@@ -143,7 +155,7 @@ export async function syncRules(gc: Gcal, calendarId: string, rules: Rule[], tod
 /* ── Sesi ────────────────────────────────────────────────── */
 export interface SessionView {
   id: string; code: string; status: 'scheduled' | 'done' | 'cancelled'; mode: 'private' | 'group';
-  starts_at: string; ends_at: string; place: string; pretest_url: string; posttest_url: string;
+  starts_at: string; ends_at: string; place: string; place_kind?: 'online' | 'offline' | 'diskusi'; pretest_url: string; posttest_url: string;
   course_code: string; course_title: string; topic: string;
   mentor: { name: string; email: string };
   students: { profile_id: string; name: string; email: string; paid: boolean }[];
@@ -176,7 +188,8 @@ export function sessionDescription(s: SessionView, site: string): string {
   if (s.topic) lines.push(`Topik: ${s.topic}`);
   lines.push(`Mentor: ${s.mentor.name}`);
   if (paid.length) lines.push(`Peserta: ${paid.map((x) => x.name || x.email).join(', ')}`);
-  if (s.place) lines.push(`Tempat: ${s.place}`);
+  if (s.place_kind === 'diskusi') lines.push('Tempat: dibahas lewat WhatsApp dengan mentor (lihat halaman sesi).');
+  else if (s.place) lines.push(`${s.place_kind === 'offline' ? 'Tempat' : 'Kelas online'}: ${s.place}`);
   lines.push('');
   if (s.pretest_url) lines.push(`Pretest (kerjakan sebelum sesi): ${s.pretest_url}`);
   if (s.posttest_url) lines.push(`Posttest (kerjakan di akhir sesi): ${s.posttest_url}`);

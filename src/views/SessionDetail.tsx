@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Shell } from '../components/Shell';
+import { PlaceEditor, PlaceInfo } from '../components/place';
+import { seatInfo } from '../domain/slots';
 import { Icon } from '../components/Icon';
 import { Field, Modal, confirmDialog, Empty } from '../components/ui';
 import { SlotPicker } from '../components/SlotPicker';
 import { Avatar, Banner, CourseChip, ExtLink, Score, ScoreChange, SessionPill, StatePill, WaButton, useAction } from '../components/bits';
 import {
-  SITE, cancelPending, cancelSession, confirmPayment, markReady, proofUrl, rateSession, rejectPayment, reschedule,
+  SITE, addSeat, cancelPending, cancelSession, confirmPayment, markReady, proofUrl, rateSession, rejectPayment, reschedule,
   setSessionTests, submitReport, syncSessionNow, updateSession, uploadProof, useData, useMe, useStore,
 } from '../store';
 import { useNow, useTitle } from '../hooks';
@@ -14,7 +16,7 @@ import { hm, longDate, rupiah, shortDate, timeOf, toLocal, until } from '../doma
 import { stateOf, topicProgress } from '../domain/mastery';
 import { cancelMessage } from '../domain/wa';
 import type { Slot } from '../domain/slots';
-import { ATT_LABEL, KIND_LABEL, MODE_LABEL, type Attendance, type Data, type Profile, type Seat, type Session } from '../domain/types';
+import { ATT_LABEL, GROUP_MAX, KIND_LABEL, MODE_LABEL, type Attendance, type Data, type Profile, type Seat, type Session } from '../domain/types';
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -49,10 +51,12 @@ export default function SessionDetail() {
         <div className="grid g3">
           <Info icon="calendar" label="Waktu">{longDate(toLocal(s.starts_at).date)}<br />{timeOf(s.starts_at)}–{timeOf(s.ends_at)} WIB{s.status === 'scheduled' && !started ? <div className="small muted">{until(s.starts_at, now)}</div> : null}</Info>
           <Info icon="user" label="Mentor">{mentor?.full_name ?? 'Mentor'}{s.mentor_ready_at ? <div className="small" style={{ color: 'var(--mastered-ink)' }}>Sudah siap mengajar</div> : null}</Info>
-          <Info icon="users" label="Jenis">{MODE_LABEL[s.mode]}{s.mode === 'group' ? ` · ${seats.length}/5 · ${s.is_open ? 'terbuka' : 'tertutup'}` : ''}</Info>
+          <Info icon="users" label="Jenis">{MODE_LABEL[s.mode]} · {rupiah(s.mode === 'private' ? data.settings.price_private : data.settings.price_group)}{s.mode === 'group' ? '/orang' : ''}
+            {s.mode === 'group' && <div><span className={`seat ${seatInfo(seats.length).tone}`}>{seatInfo(seats.length).text}</span> <span className="small muted">{s.is_open ? 'terbuka' : 'tertutup'}</span></div>}
+          </Info>
         </div>
         <div className="row wrap">
-          {s.place ? (/^https?:/.test(s.place) ? <a className="btn accent" href={s.place} target="_blank" rel="noreferrer"><Icon name="play" size={14} />Masuk kelas online</a> : <span className="pill">{s.place}</span>) : <span className="small muted">Tautan kelas dikirim mentor sebelum sesi.</span>}
+          <PlaceInfo s={s} />
           {pre && <a className="btn" href={pre} target="_blank" rel="noreferrer"><Icon name="note" size={14} />Pretest</a>}
           {post && <a className="btn" href={post} target="_blank" rel="noreferrer"><Icon name="check" size={14} />Posttest</a>}
         </div>
@@ -221,6 +225,12 @@ function StaffPanel({ s, seats, data, me }: { s: Session; seats: Seat[]; data: D
           Pelajari materi dan konteks peserta paling lambat H-1, lalu klik tombol ini supaya admin tahu.
         </Banner>
       )}
+      {isMentor && s.status === 'scheduled' && (
+        <div className="card stack">
+          <div className="row between wrap"><div className="h-card">Tempat kelas</div><span className="small muted">Peserta diberi tahu setiap kali kamu mengubahnya.</span></div>
+          <PlaceEditor s={s} />
+        </div>
+      )}
       {isMentor && s.status !== 'cancelled' && <TestLinks s={s} data={data} />}
       {overdue && <Banner tone="warn" icon="note" title="Laporan sesi belum diisi" action={<button className="btn primary sm" onClick={() => setReporting(true)}>Isi laporan</button>}>Isi kehadiran dan nilai paling lambat 24 jam setelah sesi.</Banner>}
 
@@ -279,8 +289,9 @@ function TestLinks({ s, data }: { s: Session; data: Data }) {
     <div className="card stack">
       <div className="row between wrap">
         <div className="h-card">Link pretest dan posttest</div>
-        <span className="small muted">Peserta melihat tombolnya di halaman sesi dan di Google Calendar.</span>
+        <a className="btn sm" href="https://docs.google.com/forms/create" target="_blank" rel="noreferrer"><Icon name="plus" size={14} />Buat Google Form baru</a>
       </div>
+      <p className="small muted">Buat formulir kuis di Google Forms (aktifkan mode Kuis supaya nilainya otomatis), klik Kirim, salin tautannya, lalu tempel di sini. Peserta melihat tombol Pretest dan Posttest di Kelasku, halaman sesi, dan Google Calendar.</p>
       <div className="form-grid">
         <Field label="Pretest (menit 0–5)" hint={topic?.pretest_url ? 'Kosongkan untuk memakai link bawaan topik.' : 'Tempel link Google Form.'}>
           {(id) => <input id={id} className="input" value={pre} onChange={(e) => setPre(e.target.value)} placeholder={topic?.pretest_url || 'https://forms.gle/…'} />}
@@ -401,7 +412,7 @@ function AdminPanel({ s, data }: { s: Session; data: Data }) {
   const { busy, run } = useAction();
   const seats = data.seats.filter((x) => x.session_id === s.id && x.payment_status === 'pending');
   const [edit, setEdit] = useState(false);
-  const [f, setF] = useState({ topic_id: s.topic_id ?? '', place: s.place, pretest_url: s.pretest_url, posttest_url: s.posttest_url });
+  const [f, setF] = useState({ topic_id: s.topic_id ?? '', pretest_url: s.pretest_url, posttest_url: s.posttest_url });
   const gcal = useStore((r) => r.gcal);
   return (
     <>
@@ -420,16 +431,16 @@ function AdminPanel({ s, data }: { s: Session; data: Data }) {
                   {data.topics.filter((t) => t.course_id === s.course_id).map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
                 </select>
               )}</Field>
-              <Field label="Tempat atau tautan kelas">{(id) => <input id={id} className="input" value={f.place} onChange={(e) => setF({ ...f, place: e.target.value })} placeholder="https://meet.google.com/…" />}</Field>
               <Field label="Pretest khusus sesi ini" hint="Kosongkan untuk memakai tautan topik.">{(id) => <input id={id} className="input" value={f.pretest_url} onChange={(e) => setF({ ...f, pretest_url: e.target.value })} placeholder="https://forms.gle/…" />}</Field>
               <Field label="Posttest khusus sesi ini" hint="Kosongkan untuk memakai tautan topik.">{(id) => <input id={id} className="input" value={f.posttest_url} onChange={(e) => setF({ ...f, posttest_url: e.target.value })} placeholder="https://forms.gle/…" />}</Field>
             </div>
             <div className="row"><button className="btn" onClick={() => setEdit(false)}>Batal</button>
-              <button className="btn primary" disabled={!!busy} onClick={() => run('e', async () => { await updateSession(s.id, { topic_id: f.topic_id || null, place: f.place.trim(), pretest_url: f.pretest_url.trim(), posttest_url: f.posttest_url.trim() }); setEdit(false); }, 'Sesi diperbarui.')}>Simpan</button></div>
+              <button className="btn primary" disabled={!!busy} onClick={() => run('e', async () => { await updateSession(s.id, { topic_id: f.topic_id || null, pretest_url: f.pretest_url.trim(), posttest_url: f.posttest_url.trim() }); setEdit(false); }, 'Sesi diperbarui.')}>Simpan</button></div>
           </>
         ) : (
-          <div className="small muted">Ubah topik, tautan kelas, atau tautan tes khusus sesi ini. Perubahan ikut ke Google Calendar.</div>
+          <div className="small muted">Ubah topik atau tautan tes khusus sesi ini. Tempat kelas diatur mentor. Perubahan ikut ke Google Calendar dan tercatat di Pusat data.</div>
         )}
+        {s.status === 'scheduled' && s.mode === 'group' && <AddStudent s={s} data={data} />}
         <div className="divider" />
         <div className="row wrap between">
           <div className="small">
@@ -469,6 +480,31 @@ export function PaymentRow({ s, seat, data, compact }: { s: Session; seat: Seat;
         }}>Tolak</button>
         <button className="btn sm primary" disabled={!!busy} onClick={() => run('c', () => confirmPayment(s.id, seat.student_id), `Pembayaran ${p?.full_name} dikonfirmasi.`)}><Icon name="check" size={14} />Konfirmasi lunas</button>
       </div>
+    </div>
+  );
+}
+
+/** Admin menambahkan peserta ke kelas bersama (termasuk yang tertutup), sampai 5 orang. */
+function AddStudent({ s, data }: { s: Session; data: Data }) {
+  const { busy, run } = useAction();
+  const [pick, setPick] = useState('');
+  const [paid, setPaid] = useState(false);
+  const inside = new Set(data.seats.filter((x) => x.session_id === s.id).map((x) => x.student_id));
+  const options = data.profiles.filter((p) => p.role === 'student' && p.active && !inside.has(p.id)
+    && data.enrollments.some((e) => e.student_id === p.id && e.course_id === s.course_id && e.status === 'active'));
+  if (inside.size >= GROUP_MAX) return <p className="small muted" style={{ marginTop: 10 }}>Kelas penuh ({GROUP_MAX}/{GROUP_MAX}).</p>;
+  return (
+    <div className="stack sm" style={{ marginTop: 12 }}>
+      <div className="strong small">Tambah peserta ke kelas ini ({inside.size}/{GROUP_MAX}){s.is_open ? '' : ' · kelas tertutup, hanya lewat admin'}</div>
+      {options.length === 0 ? <p className="small muted">Tidak ada peserta lain yang terdaftar di mata kuliah ini.</p> : (
+        <div className="row wrap">
+          <select className="select sm" style={{ maxWidth: 260 }} value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Pilih peserta">
+            <option value="">Pilih peserta…</option>{options.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </select>
+          <label className="check small"><input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />Sudah bayar ke admin</label>
+          <button className="btn sm" disabled={!pick || !!busy} onClick={() => run('add', async () => { await addSeat(s.id, pick, paid); setPick(''); }, 'Peserta ditambahkan.')}>Tambah</button>
+        </div>
+      )}
     </div>
   );
 }

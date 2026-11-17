@@ -66,7 +66,7 @@ const friendly = (m: string) => {
   if (/url.*https?|~\*/i.test(m)) return 'Tautan harus diawali https://';
   return m;
 };
-export class AppError extends Error {}
+export class AppError extends Error { name = "AppError"; }
 function ok<R extends { error: { message: string } | null }>(res: R): R extends { data: infer D } ? NonNullable<D> : never {
   if (res.error) throw new AppError(friendly(res.error.message));
   return (res as any).data;
@@ -238,11 +238,24 @@ export async function setCompetency(mentorId: string, courseId: string, status: 
 
 // Ketersediaan
 const t2s = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-export async function saveRule(d: { id?: string; mentor_id: string; weekday: number; start_min: number; end_min: number; modes: Rule['modes']; active?: boolean }) {
-  await upsert<Rule>('availability_rules', { id: d.id, mentor_id: d.mentor_id, weekday: d.weekday, start_time: t2s(d.start_min), end_time: t2s(d.end_min), modes: d.modes, active: d.active ?? true });
-  syncRules(); await reload();
+export interface RuleDraft {
+  id?: string; mentor_id: string; weekday: number; start_min: number; end_min: number; modes: Rule['modes']; active?: boolean;
+  group_open?: boolean; place_kind?: Rule['place_kind']; place?: string; valid_from?: string; valid_until?: string | null;
 }
-export async function removeRule(id: string) { await del('availability_rules', id); syncRules(); await reload(); }
+export async function saveRule(d: RuleDraft) {
+  if (d.place_kind === 'online' && d.place && !/^https?:\/\//i.test(d.place.trim())) throw new AppError('Tautan kelas online harus diawali https://');
+  if (d.place_kind === 'offline' && !d.place?.trim()) throw new AppError('Isi lokasi tatap muka, misalnya: Perpustakaan ITS lantai 2.');
+  if (d.valid_until && d.valid_from && d.valid_until < d.valid_from) throw new AppError('Tanggal "sampai" harus sama atau setelah tanggal mulai.');
+  await upsert<Rule>('availability_rules', {
+    id: d.id, mentor_id: d.mentor_id, weekday: d.weekday, start_time: t2s(d.start_min), end_time: t2s(d.end_min), modes: d.modes, active: d.active ?? true,
+    ...(d.group_open !== undefined ? { group_open: d.group_open } : {}),
+    ...(d.place_kind ? { place_kind: d.place_kind, place: (d.place ?? '').trim() } : {}),
+    ...(d.valid_from ? { valid_from: d.valid_from } : {}),
+    ...(d.valid_until !== undefined ? { valid_until: d.valid_until || null } : {}),
+  });
+  syncRules(d.mentor_id); await reload();
+}
+export async function removeRule(id: string) { const r = root.data.rules.find((x) => x.id === id); await del('availability_rules', id); syncRules(r?.mentor_id); await reload(); }
 export async function saveException(d: Draft<AvailabilityException>) { await upsert<AvailabilityException>('availability_exceptions', d); await reload(); }
 export async function removeException(id: string) { await del('availability_exceptions', id); await reload(); }
 
@@ -285,8 +298,20 @@ export async function submitReport(sessionId: string, status: 'scheduled' | 'don
 }
 export async function markReady(sessionId: string) { await rpc('mark_ready', { p_session: sessionId }); await reload(); }
 export async function rateSession(sessionId: string, rating: number, feedback: string) { await rpc('rate_session', { p_session: sessionId, p_rating: rating, p_feedback: feedback }); await reload(); }
-export async function updateSession(id: string, patch: Partial<Pick<Session, 'place' | 'pretest_url' | 'posttest_url' | 'topic_id' | 'is_open'>>) {
+export async function setSessionPlace(sessionId: string, kind: Session['place_kind'], place: string) {
+  await rpc('set_session_place', { p_session: sessionId, p_kind: kind, p_place: place.trim() }); syncSession(sessionId); await reload();
+}
+export async function updateSession(id: string, patch: Partial<Pick<Session, 'place' | 'place_kind' | 'pretest_url' | 'posttest_url' | 'topic_id' | 'is_open'>>) {
   ok(await sb.from('academie_sessions').update(patch).eq('id', id)); syncSession(id); await reload();
+}
+
+// Tambah peserta ke kelas bersama (admin). Kapasitas dijaga trigger database.
+export async function addSeat(sessionId: string, studentId: string, paid: boolean) {
+  const hold = root.data.settings.hold_hours;
+  ok(await sb.from('academie_session_students').insert(paid
+    ? { session_id: sessionId, student_id: studentId, payment_status: 'paid', paid_via: 'admin', confirmed_at: new Date().toISOString() }
+    : { session_id: sessionId, student_id: studentId, payment_status: 'pending', hold_expires_at: new Date(Date.now() + hold * 3_600_000).toISOString() }));
+  syncSession(sessionId); await reload();
 }
 
 // Kredit (admin)
@@ -339,3 +364,49 @@ export async function publicCourses() {
   const { data } = await sb.from('academie_courses').select('id, code, title, semester, kind, category').eq('active', true).order('title');
   return (data ?? []) as Pick<Course, 'id' | 'code' | 'title' | 'semester' | 'kind' | 'category'>[];
 }
+
+/* ── Pusat data admin ────────────────────────────────────── */
+export interface HealthIssue { key: string; level: 'bad' | 'warn' | 'info'; title: string; detail: string; count: number; items: { label: string; link: string }[] }
+export async function healthCheck() { return rpc<HealthIssue[]>('health', {}); }
+export interface AuditRow { id: number; at: string; actor: string | null; tbl: string; op: 'INSERT' | 'UPDATE' | 'DELETE'; row_id: string; old: Record<string, unknown> | null; new: Record<string, unknown> | null; restored_at: string | null }
+export async function auditLog(p: { table?: string; rowId?: string; limit?: number; before?: number }) {
+  let q = sb.from('academie_audit').select('*').order('id', { ascending: false }).limit(p.limit ?? 60);
+  if (p.table) q = q.eq('tbl', p.table);
+  if (p.rowId) q = q.eq('row_id', p.rowId);
+  if (p.before) q = q.lt('id', p.before);
+  return ok(await q) as AuditRow[];
+}
+export async function restoreAudit(id: number) { await rpc('audit_restore', { p_id: id }); await reload(); }
+export interface ErrorRow { id: number; created_at: string; profile_id: string | null; path: string; message: string; detail: string; user_agent: string; resolved_at: string | null }
+export async function errorLog(limit = 100) { return ok(await sb.from('academie_error_log').select('*').order('id', { ascending: false }).limit(limit)) as ErrorRow[]; }
+export async function resolveErrors(ids: number[]) { ok(await sb.from('academie_error_log').update({ resolved_at: new Date().toISOString() }).in('id', ids)); }
+/** Ubah satu baris tabel apa pun (admin). Kunci: { id } atau kunci gabungan. Semua perubahan tercatat di riwayat. */
+export async function adminUpdate(table: string, key: Record<string, string | number>, patch: Record<string, unknown>) {
+  let q = sb.from(`academie_${table}`).update(patch);
+  for (const [k, v] of Object.entries(key)) q = q.eq(k, v);
+  const res = ok(await q.select()) as unknown[];
+  if (!res.length) throw new AppError('Baris tidak ditemukan atau tidak berubah.');
+  await reload();
+}
+export async function adminDelete(table: string, key: Record<string, string | number>) {
+  let q = sb.from(`academie_${table}`).delete();
+  for (const [k, v] of Object.entries(key)) q = q.eq(k, v);
+  ok(await q); await reload();
+}
+
+/* ── Log galat dari browser ──────────────────────────────── */
+const sentErrors = new Set<string>();
+export function logError(message: string, detail = '') {
+  if (!configured || root.status !== 'ready') return;
+  const k = message.slice(0, 120);
+  if (sentErrors.has(k) || sentErrors.size > 20) return;
+  sentErrors.add(k);
+  sb.rpc('academie_log_error', { p_path: location.pathname, p_message: message, p_detail: detail, p_ua: navigator.userAgent }).then(() => {}, () => {});
+}
+export interface Integrations {
+  google: { name: string; role: string; email: string | null; connected_at: string; calendar: boolean; last_error: string | null }[];
+  mentors_without_google: string[];
+  jobs: { name: string; schedule: string; active: boolean; last_status: string | null; last_run: string | null; last_message: string; failed_24h: number }[];
+  sync_pending: number; sync_errors: number; last_sync: string | null; audit_rows: number; errors_open: number;
+}
+export async function integrations() { return rpc<Integrations>('integrations', {}); }

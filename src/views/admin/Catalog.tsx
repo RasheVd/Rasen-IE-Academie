@@ -61,6 +61,10 @@ function TopicEditor({ course, data }: { course: Course; data: Data }) {
   const urlOk = (v: string) => v === '' || /^https?:\/\//i.test(v.trim());
   return (
     <div style={{ padding: '4px 16px 16px', background: '#fafbfb' }}>
+      <p className="small muted" style={{ margin: '8px 0' }}>
+        Tautan di sini jadi tes bawaan setiap sesi topik itu. Mentor bisa menimpanya per sesi di halaman sesi.{' '}
+        <a href="https://docs.google.com/forms/create" target="_blank" rel="noreferrer">Buat Google Form baru</a> (pakai mode Kuis), klik Kirim, salin tautannya, lalu tempel di kolom pretest atau posttest.
+      </p>
       <div className="table-wrap">
         <table className="table">
           <thead><tr><th>#</th><th>Topik</th><th>Tautan pretest (Google Form)</th><th>Tautan posttest</th><th /></tr></thead>

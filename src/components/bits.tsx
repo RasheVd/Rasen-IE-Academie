@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, type IconName } from './Icon';
 import { colorVar } from './ui';
-import { toast } from '../store';
+import { AppError, logError, toast } from '../store';
 import { STATE_LABEL, stateOf, type TopicState } from '../domain/mastery';
 import { MODE_LABEL, type Course, type Data, type Profile, type Seat, type Session, type Settings } from '../domain/types';
 import { dayShort, hm, shortDate, timeOf, toLocal } from '../domain/time';
@@ -144,6 +144,8 @@ export function useAction() {
       return r;
     } catch (e) {
       toast((e as Error).message, 'error');
+      // Pesan aturan bisnis (AppError) bukan galat; selain itu dicatat untuk admin.
+      if (!(e instanceof AppError)) logError((e as Error).message || String(e), (e as Error).stack ?? '');
       return undefined;
     } finally {
       setBusy(null);

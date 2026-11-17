@@ -85,7 +85,7 @@ async function syncMentorRules(mentorId: string, cache: Map<string, Gcal | null>
   if (!acc?.calendar_id) return { ok: false, reason: 'belum-tersambung' };
   const gc = await accessToken(acc, cache);
   if (!gc) return { ok: false, reason: 'token' };
-  const { data: rules } = await db.from('academie_availability_rules').select('id, weekday, start_min, end_min, active, gcal_events').eq('mentor_id', mentorId);
+  const { data: rules } = await db.from('academie_availability_rules').select('id, weekday, start_min, end_min, active, modes, valid_from, valid_until, gcal_events').eq('mentor_id', mentorId);
   const todo = (rules ?? []).filter((r: Rule) => r.active || r.gcal_events.length);
   const now = new Date();
   const map = await syncRules(gc, acc.calendar_id, todo, toLocal(now).date, now);
@@ -121,7 +121,7 @@ async function processSession(sessionId: string, cache: Map<string, Gcal | null>
   if (mentorGc && mentorAcc?.calendar_id) organizer = { kind: 'mentor', calendarId: mentorAcc.calendar_id, gc: mentorGc };
   else if (adminGc && adminAcc?.calendar_id) organizer = { kind: 'admin', calendarId: adminAcc.calendar_id, gc: adminGc };
 
-  const { data: rules } = await db.from('academie_availability_rules').select('id, weekday, start_min, end_min, active, gcal_events').eq('mentor_id', s.mentor_id);
+  const { data: rules } = await db.from('academie_availability_rules').select('id, weekday, start_min, end_min, active, modes, valid_from, valid_until, gcal_events').eq('mentor_id', s.mentor_id);
   const studentClients: { profile_id: string; gc: Gcal }[] = [];
   for (const st of students) {
     const a = accs.get(st.profile_id);
@@ -133,7 +133,7 @@ async function processSession(sessionId: string, cache: Map<string, Gcal | null>
 
   const view: SessionView = {
     id: s.id, code: s.code, status: s.status, mode: s.mode, starts_at: new Date(s.starts_at).toISOString(), ends_at: new Date(s.ends_at).toISOString(),
-    place: s.place, pretest_url: s.pretest_url, posttest_url: s.posttest_url,
+    place: s.place, place_kind: s.place_kind, pretest_url: s.pretest_url, posttest_url: s.posttest_url,
     course_code: s.course?.code ?? '', course_title: s.course?.title ?? '', topic: s.topic?.title ?? '',
     mentor: { name: s.mentor?.full_name ?? '', email: s.mentor?.email ?? '' }, students,
     gcal_calendar_id: s.gcal_calendar_id, gcal_event_id: s.gcal_event_id, gcal_kind: s.gcal_kind, gcal_admin_event_id: s.gcal_admin_event_id,

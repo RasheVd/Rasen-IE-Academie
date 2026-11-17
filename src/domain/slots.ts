@@ -1,19 +1,48 @@
 /**
  * Slot booking dari pola ketersediaan mentor. Logika yang sama dijaga ulang di
  * database (academie__book), jadi ini hanya untuk menampilkan pilihan.
+ *
+ * Slot yang sudah terisi tidak dibuang bila diminta (includeTaken): peserta melihat
+ * kelas bersama yang penuh (merah), tertutup, atau jam yang sudah dibooking orang lain.
  */
-import type { BookingOptions, Mode } from './types';
+import { GROUP_MAX, type BookingOptions, type Mode, type PlaceKind } from './types';
 import { addDays, fromLocal, toLocal } from './time';
+
+/** free: bisa dibooking · join: kelas bersama yang bisa diikuti · full: kelas bersama penuh · closed: kelas bersama tertutup · taken: sudah dibooking. */
+export type SlotState = 'free' | 'join' | 'full' | 'closed' | 'taken';
 
 export interface Slot {
   mentor_id: string;
   starts_at: string;      // ISO UTC
   date: string;           // WIB
   min: number;            // menit WIB
+  state: SlotState;
+  modes: 'private' | 'group' | 'both';
+  group_open: boolean;    // status kelas bersama baru di slot ini
+  place_kind: PlaceKind;
+  seats?: number;         // jumlah peserta bila sudah ada sesi
+  takenMode?: Mode;       // jenis sesi yang mengisi slot
   join?: { session_id: string; seats: number; topic_id: string | null }; // kelas bersama yang bisa diikuti
 }
 
-export function availableSlots(opt: BookingOptions, p: { courseId: string; mode: Mode; now: number; cutoffHours: number; horizonDays: number; mentorId?: string }): Slot[] {
+export const bookable = (s: Pick<Slot, 'state'>) => s.state === 'free' || s.state === 'join';
+
+/** Berlaku di tanggal ini? valid_from/valid_until boleh kosong (data lama). */
+export function ruleValidOn(r: { valid_from?: string | null; valid_until?: string | null }, date: string): boolean {
+  return (!r.valid_from || date >= r.valid_from) && (!r.valid_until || date <= r.valid_until);
+}
+
+/** Sisa kursi kelas bersama dan tingkat peringatannya. */
+export function seatInfo(seats: number): { left: number; tone: 'ok' | 'warn' | 'bad'; text: string } {
+  const left = Math.max(0, GROUP_MAX - seats);
+  if (left === 0) return { left, tone: 'bad', text: `Penuh ${seats}/${GROUP_MAX}` };
+  if (left <= 2) return { left, tone: 'warn', text: `${seats}/${GROUP_MAX} · sisa ${left} kursi` };
+  return { left, tone: 'ok', text: `${seats}/${GROUP_MAX} · sisa ${left} kursi` };
+}
+
+export function availableSlots(opt: BookingOptions, p: {
+  courseId: string; mode: Mode; now: number; cutoffHours: number; horizonDays: number; mentorId?: string; includeTaken?: boolean;
+}): Slot[] {
   const earliest = p.now + p.cutoffHours * 3_600_000;
   const latest = p.now + p.horizonDays * 864e5;
   const today = toLocal(p.now).date;
@@ -30,19 +59,27 @@ export function availableSlots(opt: BookingOptions, p: { courseId: string; mode:
       const date = addDays(today, i);
       if (off.some((e) => date >= e.starts_on && date <= e.ends_on)) continue;
       const wd = toLocal(fromLocal(date, 12 * 60)).weekday;
-      for (const r of rules.filter((x) => x.weekday === wd)) {
+      for (const r of rules.filter((x) => x.weekday === wd && ruleValidOn(x, date))) {
         for (let min = r.start_min; min + 60 <= r.end_min; min += 60) {
           const start = fromLocal(date, min).getTime(), end = start + 3_600_000;
           if (start < earliest || start > latest) continue;
           if (busy.some((b) => overlaps(start, end, b.s, b.e))) continue;
+          const base = {
+            mentor_id: m.id, starts_at: new Date(start).toISOString(), date, min,
+            modes: r.modes, group_open: r.group_open ?? true, place_kind: r.place_kind ?? 'online',
+          } as const;
           const hit = taken.find((t) => overlaps(start, end, t.s, t.e));
-          if (hit) {
-            if (p.mode === 'group' && hit.mode === 'group' && hit.is_open && hit.course_id === p.courseId && hit.s === start && hit.seats < 5) {
-              out.push({ mentor_id: m.id, starts_at: new Date(start).toISOString(), date, min, join: { session_id: hit.id, seats: hit.seats, topic_id: hit.topic_id } });
-            }
-            continue;
-          }
-          out.push({ mentor_id: m.id, starts_at: new Date(start).toISOString(), date, min });
+          if (!hit) { out.push({ ...base, state: 'free' }); continue; }
+          const sameGroup = hit.mode === 'group' && hit.s === start && hit.course_id === p.courseId;
+          let state: SlotState = 'taken';
+          if (sameGroup && hit.seats >= GROUP_MAX) state = 'full';
+          else if (sameGroup && !hit.is_open) state = 'closed';
+          else if (sameGroup && p.mode === 'group') state = 'join';
+          if (state !== 'join' && !p.includeTaken) continue;
+          out.push({
+            ...base, state, seats: hit.seats, takenMode: hit.mode, group_open: hit.is_open,
+            ...(state === 'join' ? { join: { session_id: hit.id, seats: hit.seats, topic_id: hit.topic_id } } : {}),
+          });
         }
       }
     }

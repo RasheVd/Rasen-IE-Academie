@@ -21,7 +21,7 @@ const s1 = await login('siswa'), s2 = await login('siswa2'), mentor = await logi
 const me1 = (await post(s1, 'rpc/academie_ensure_profile', {})).body;
 const me2 = (await post(s2, 'rpc/academie_ensure_profile', {})).body;
 const mm = (await post(mentor, 'rpc/academie_ensure_profile', {})).body;
-const sti = (await get(anon, 'academie_courses?code_key=eq.STI1&select=id')).body[0].id;
+const sti = (await get(anon, 'academie_courses?code_key=eq.STAT1&select=id')).body[0].id;
 
 // Tamu tanpa login
 let r = await get(anon, 'academie_profiles?select=email');

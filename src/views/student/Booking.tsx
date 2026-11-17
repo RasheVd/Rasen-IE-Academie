@@ -8,7 +8,7 @@ import { book, toast, useData, useMe } from '../../store';
 import { useTitle } from '../../hooks';
 import { hm, longDate, rupiah } from '../../domain/time';
 import type { Slot } from '../../domain/slots';
-import { MODE_LABEL, courseGroup, groupCourses, type BookingOptions, type Mode } from '../../domain/types';
+import { GROUP_MAX, MODE_LABEL, PLACE_LABEL, courseGroup, groupCourses, type BookingOptions, type Mode } from '../../domain/types';
 
 export default function Booking() {
   useTitle('Booking sesi');
@@ -21,7 +21,6 @@ export default function Booking() {
   const [courseId, setCourseId] = useState(() => courses.find((c) => c.id === params.get('course'))?.id ?? (courses.length === 1 ? courses[0].id : ''));
   const [topicId, setTopicId] = useState(() => params.get('topic') ?? '');
   const [mode, setMode] = useState<Mode>('private');
-  const [open, setOpen] = useState(true);
   const [mentorId, setMentorId] = useState('');
   const [mentors, setMentors] = useState<BookingOptions['mentors']>([]);
   const [pick, setPick] = useState<Slot | null>(null);
@@ -42,7 +41,7 @@ export default function Booking() {
   const pickTopic = pick?.join?.topic_id ?? (validTopic ? topicId : null);
   async function confirm() {
     if (!pick) return;
-    const r = await run('book', () => book({ mentor: pick.mentor_id, course: courseId, topic: pickTopic, starts_at: pick.starts_at, mode, open }));
+    const r = await run('book', () => book({ mentor: pick.mentor_id, course: courseId, topic: pickTopic, starts_at: pick.starts_at, mode, open: pick.group_open }));
     if (r) nav(`/sesi/${r.session_id}${r.paid ? '?baru=kredit' : '?baru=1'}`);
   }
 
@@ -90,18 +89,13 @@ export default function Booking() {
             </div>
             <div className="choice-grid" style={{ marginTop: 14 }}>
               <button className="choice" aria-pressed={mode === 'private'} onClick={() => { setMode('private'); setPick(null); }}>
-                <span className="t">Private · {rupiah(s.price_private)}</span><span className="s">Hanya kamu dan mentor</span>
+                <span className="t">Private · {rupiah(s.price_private)}</span><span className="s">Per sesi 60 menit. Hanya kamu dan mentor.</span>
               </button>
               <button className="choice" aria-pressed={mode === 'group'} onClick={() => { setMode('group'); setPick(null); }}>
-                <span className="t">Kelas bersama · {rupiah(s.price_group)}</span><span className="s">Maksimal 5 peserta mata kuliah yang sama</span>
+                <span className="t">Kelas bersama · {rupiah(s.price_group)}/orang</span><span className="s">Per sesi 60 menit. Maksimal {GROUP_MAX} peserta mata kuliah yang sama.</span>
               </button>
             </div>
-            {mode === 'group' && (
-              <label className="check" style={{ marginTop: 12 }}>
-                <input type="checkbox" checked={open} onChange={(e) => setOpen(e.target.checked)} />
-                <span>Buka untuk peserta lain bila saya membuka kelas baru<br /><span className="small muted">Matikan bila hanya untuk kamu dan teman yang kamu ajak lewat admin.</span></span>
-              </label>
-            )}
+            <p className="small muted" style={{ marginTop: 10 }}>Mentor yang menentukan jenis kelas di tiap jam. Jam yang hanya untuk private tidak muncul di pilihan kelas bersama, begitu juga sebaliknya.</p>
           </section>
         )}
 
@@ -110,8 +104,11 @@ export default function Booking() {
             <div className="step-title"><span className="n">3</span>Pilih jam</div>
             {!topicReady && <p className="small muted" style={{ marginBottom: 10 }}>Pilih topik dulu supaya nilai tercatat di topik yang benar. Bergabung ke kelas bersama yang sudah ada memakai topik kelas itu.</p>}
             <div className="cal-legend" style={{ marginBottom: 12 }}>
-              <span><i className="free" />Slot kosong</span>
-              {mode === 'group' && <span><i style={{ background: '#efeafd', borderColor: '#9b8ce0' }} />Kelas bersama yang bisa kamu ikuti</span>}
+              <span><i className="free" />Bisa dibooking</span>
+              {mode === 'group' && <span><i className="join" />Kelas bersama yang bisa kamu ikuti</span>}
+              {mode === 'group' && <span><i className="warn" />Sisa 1–2 kursi</span>}
+              <span><i className="full" />Penuh</span>
+              <span><i className="taken" />Sudah terisi</span>
             </div>
             <SlotPicker courseId={courseId} mode={mode} mentorId={mentorId} onMentors={setMentors}
               onPick={(sl) => { if (!sl.join && !topicReady) { toast('Pilih topik dulu di langkah 2.', 'error'); return; } setPick(sl); }} />
@@ -129,10 +126,11 @@ export default function Booking() {
             <div><span>Topik</span><span>{data.topics.find((t) => t.id === pickTopic)?.title ?? (topics.length === 0 ? 'Dibahas bersama mentor' : 'Belum dipilih')}</span></div>
             <div><span>Waktu</span><span>{longDate(pick.date)}, {hm(pick.min)}–{hm(pick.min + 60)} WIB</span></div>
             <div><span>Mentor</span><span>{mentors.find((m) => m.id === pick.mentor_id)?.full_name}</span></div>
-            <div><span>Jenis</span><span>{MODE_LABEL[mode]}{pick.join ? ` (bergabung, ${pick.join.seats + 1}/5)` : mode === 'group' ? (open ? ' (terbuka)' : ' (tertutup)') : ''}</span></div>
-            <div className="total"><span>Biaya</span><span>{credits.length ? 'Pakai 1 kredit' : rupiah(price)}</span></div>
+            <div><span>Jenis</span><span>{MODE_LABEL[mode]}{pick.join ? ` (bergabung, kamu orang ke-${pick.join.seats + 1} dari ${GROUP_MAX})` : mode === 'group' ? (pick.group_open ? ' (terbuka untuk peserta lain)' : ' (tertutup)') : ''}</span></div>
+            <div><span>Tempat</span><span>{PLACE_LABEL[pick.place_kind]}</span></div>
+            <div className="total"><span>Biaya</span><span>{credits.length ? 'Pakai 1 kredit' : `${rupiah(price)}${mode === 'group' ? ' per orang' : ''}`}</span></div>
           </div>
-          {!credits.length && <p className="small muted">Slot ditahan {s.hold_hours} jam. Setelah booking, transfer lalu upload bukti di halaman sesi. Sesi pasti setelah admin konfirmasi.</p>}
+          {!credits.length && <p className="small muted">Booking langsung tercatat tanpa menunggu persetujuan mentor. Slot ditahan {s.hold_hours} jam. Setelah booking, transfer lalu upload bukti di halaman sesi. Sesi pasti setelah admin konfirmasi.</p>}
           <p className="small muted">Pindah jadwal bisa sendiri paling lambat {s.reschedule_cutoff_hours} jam sebelum sesi. Pembayaran tidak dikembalikan, tetapi berubah jadi kredit.</p>
         </Modal>
       )}

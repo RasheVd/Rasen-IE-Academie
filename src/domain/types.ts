@@ -19,7 +19,7 @@ export interface SiteTheme { preset?: string; primary?: string; accent?: string;
 /** Teks halaman depan yang diatur admin. Kosong = teks bawaan. */
 export interface SiteContent { hero_title?: string; hero_accent?: string; hero_lead?: string; cta_label?: string; about?: string; intro_3d?: boolean }
 /** Preferensi pribadi tiap orang. */
-export interface Prefs { density?: 'nyaman' | 'padat'; calendar_view?: 'day' | 'week' | 'month'; widgets?: string[]; hidden?: string[]; nav_collapsed?: boolean }
+export interface Prefs { density?: 'nyaman' | 'padat'; calendar_view?: 'day' | 'week' | 'month' | 'table'; widgets?: string[]; hidden?: string[]; nav_collapsed?: boolean }
 export interface Profile {
   id: string; user_id: string | null; email: string; full_name: string; role: Role; phone: string; bio: string;
   meeting_link: string; learning_needs: string; note: string; active: boolean; invited_at: string | null; created_at: string; prefs: Prefs;
@@ -28,14 +28,19 @@ export interface Course { id: string; code: string; title: string; category: str
 export interface Topic { id: string; course_id: string; title: string; position: number; pretest_url: string; posttest_url: string }
 export interface Enrollment { id: string; student_id: string; course_id: string; status: 'active' | 'paused' | 'finished'; goal_text: string; goal_date: string | null }
 export interface MentorCourse { mentor_id: string; course_id: string; status: 'pending' | 'approved' }
+export type PlaceKind = 'online' | 'offline' | 'diskusi';
 export interface Rule {
   id: string; mentor_id: string; weekday: number; start_time: string; end_time: string; start_min: number; end_min: number;
   modes: 'private' | 'group' | 'both'; active: boolean;
+  /** Kelas bersama baru: terbuka untuk peserta lain di mata kuliah yang sama, atau tertutup. */
+  group_open: boolean; place_kind: PlaceKind; place: string;
+  /** Masa berlaku pola (tanggal WIB). valid_until kosong = tanpa batas. */
+  valid_from: string; valid_until: string | null;
 }
 export interface AvailabilityException { id: string; mentor_id: string; starts_on: string; ends_on: string; reason: string }
 export interface Session {
   id: string; code: string; course_id: string; topic_id: string | null; mentor_id: string; starts_at: string; ends_at: string;
-  duration_min: number; mode: Mode; is_open: boolean; place: string; status: SessionStatus; pretest_url: string; posttest_url: string;
+  duration_min: number; mode: Mode; is_open: boolean; place: string; place_kind: PlaceKind; status: SessionStatus; pretest_url: string; posttest_url: string;
   report: string; followup: string; reported_at: string | null; mentor_ready_at: string | null;
   cancelled_reason: string; cancelled_by: string | null; cancelled_at: string | null; created_by: string | null;
   gcal_event_id: string | null; gcal_dirty: boolean; gcal_error: string | null; created_at: string;
@@ -74,7 +79,7 @@ export const emptyData: Data = {
 /** Hasil RPC academie_booking_options. */
 export interface BookingOptions {
   mentors: { id: string; full_name: string; bio: string }[];
-  rules: { mentor_id: string; weekday: number; start_min: number; end_min: number; modes: 'private' | 'group' | 'both' }[];
+  rules: { mentor_id: string; weekday: number; start_min: number; end_min: number; modes: 'private' | 'group' | 'both'; group_open?: boolean; place_kind?: PlaceKind; valid_from?: string; valid_until?: string | null }[];
   exceptions: { mentor_id: string; starts_on: string; ends_on: string }[];
   busy: { mentor_id: string; starts_at: string; ends_at: string }[];
   sessions: { id: string; mentor_id: string; course_id: string; topic_id: string | null; starts_at: string; ends_at: string; mode: Mode; is_open: boolean; seats: number }[];
@@ -82,6 +87,10 @@ export interface BookingOptions {
 
 export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', mentor: 'Mentor', student: 'Peserta' };
 export const MODE_LABEL: Record<Mode, string> = { private: 'Private', group: 'Kelas bersama' };
+export const RULE_MODE_LABEL: Record<Rule['modes'], string> = { private: 'Private saja', group: 'Kelas bersama saja', both: 'Private atau bersama' };
+export const PLACE_LABEL: Record<PlaceKind, string> = { online: 'Online', offline: 'Tatap muka', diskusi: 'Tempat dibahas lewat WhatsApp' };
+/** Kapasitas kelas bersama. */
+export const GROUP_MAX = 5;
 export const ATT_LABEL: Record<Attendance, string> = { present: 'Hadir', absent: 'Tidak hadir', excused: 'Izin' };
 export const KIND_LABEL: Record<MaterialKind, string> = { ppt: 'PPT', pdf: 'PDF', latihan: 'Latihan', video: 'Video', link: 'Tautan' };
 export const WEEKDAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];

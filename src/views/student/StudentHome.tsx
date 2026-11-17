@@ -4,10 +4,12 @@ import { Icon } from '../../components/Icon';
 import { AdminContact, Banner, ExtLink, SessionItem } from '../../components/bits';
 import { Empty } from '../../components/ui';
 import { useData, useMe } from '../../store';
+import { PlaceInfo } from '../../components/place';
 import { useNow, useTitle } from '../../hooks';
 import { longDate, timeOf, toLocal, until } from '../../domain/time';
 import { MODE_LABEL } from '../../domain/types';
 import { StudentDashboard } from './Dashboard';
+import { CourseCard } from './Classroom';
 
 export default function StudentHome() {
   useTitle('Dasbor');
@@ -71,8 +73,8 @@ export default function StudentHome() {
                     <div className="h-section">{data.courses.find((c) => c.id === next.course_id)?.title}{topic ? ` · ${topic.title}` : ''}</div>
                     <div className="muted">{longDate(toLocal(next.starts_at).date)}, {timeOf(next.starts_at)}–{timeOf(next.ends_at)} WIB · {MODE_LABEL[next.mode]} · {mentor?.full_name}</div>
                     <div className="row wrap">
-                      <span className="pill brand"><Icon name="clock" size={12} />{until(next.starts_at, now)}</span>
-                      {next.place && /^https?:/.test(next.place) && <ExtLink href={next.place}>Tautan kelas</ExtLink>}
+                      <span className="pill brand"><Icon name="clock" size={12} />{Date.parse(next.starts_at) <= now ? 'Sedang berlangsung' : until(next.starts_at, now)}</span>
+                      <PlaceInfo s={next} compact />
                       {pre && <ExtLink href={pre}>Pretest</ExtLink>}
                       <Link to={`/sesi/${next.id}`} className="small">Detail</Link>
                     </div>
@@ -87,6 +89,10 @@ export default function StudentHome() {
             </div>
             <AdminContact settings={s} />
           </div>
+          <section className="stack sm" aria-labelledby="kelasku">
+            <div className="row between"><h2 id="kelasku" className="h-section">Kelasku</h2><Link to="/kelas" className="small">Semua kelas</Link></div>
+            <div className="class-grid">{enrolled.filter((e) => e.status === 'active').map((e) => <CourseCard key={e.course_id} courseId={e.course_id} data={data} me={me} />)}</div>
+          </section>
           <StudentDashboard data={data} studentId={me.id} self />
         </>
       )}

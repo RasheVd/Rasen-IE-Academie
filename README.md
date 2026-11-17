@@ -8,6 +8,18 @@ Portal les privat mata kuliah Teknik Industri di **academie.my.id**, untuk tiga 
 
 Aturan bisnis dijaga di database, bukan hanya di tampilan: sesi 60 menit, private 1 orang, kelas bersama maks 5, booking paling lambat 24 jam sebelumnya, slot ditahan 12 jam menunggu bukti bayar, pindah jadwal sampai H-1 (kursi lunas jadi kredit), pembatalan mentor memberi kredit otomatis, satu mentor tidak bisa punya dua sesi bertumpuk, peserta tidak hadir tetap dihitung untuk hak mentor.
 
+## Fitur v4 (17 November 2026)
+
+Migrasi: `supabase/migrations/2026-11-17_v4.sql`.
+
+- **Jam mengajar diatur mentor**: tiap jam punya jenis kelas (private saja, kelas bersama saja, atau peserta memilih), status kelas bersama (terbuka atau tertutup), tempat (online, tatap muka, atau dibahas lewat WhatsApp dengan nomor mentor), dan masa berlaku (tiap minggu sampai tanggal tertentu, atau sekali di satu tanggal). Peserta tidak lagi memilih terbuka/tertutup. Admin melihat semua jam mentor (menu Jam mentor) tetapi tidak bisa mengubahnya; aturan ini dijaga di database.
+- **Harga dan jenis di tiap jam**: Private Rp75.000 per sesi, kelas bersama Rp40.000 per orang (maks 5). Jam yang penuh tetap tampil merah "PENUH 5/5", kelas tertutup dan jam yang sudah dibooking tampil abu-abu. Kelas bersama yang tinggal 1–2 kursi diberi tanda kuning. Mentor dan admin mendapat pemberitahuan saat kelas tinggal 1 kursi dan saat penuh.
+- **Kalender**: tanda kursi di setiap acara kelas bersama, ubah tempat dari popover, tampilan **Tabel** (spreadsheet: cari, filter status, urutkan, unduh CSV untuk Google Sheets). Klik jam kosong membuka form jam mengajar lengkap. Kalender induk admin juga punya tampilan Tabel.
+- **Kelasku** (peserta): satu ruang kelas per mata kuliah yang dipasang admin. Sesi hari ini (satu atau lebih) dengan tempat, tombol pretest (menit 0–5) dan posttest (menit 50–60), materi per topik, sesi berikutnya, riwayat, dan nilai per topik.
+- **Tambah peserta oleh admin**: di halaman sesi kelas bersama (termasuk yang tertutup), admin menambahkan peserta yang terdaftar di mata kuliah itu, sebagai menunggu bayar atau sudah bayar ke admin.
+- **Pusat data** (admin): cek kesehatan otomatis (15 pemeriksaan), status integrasi (akun Google tersambung, jadwal otomatis pg_cron), editor data per tabel, riwayat perubahan dengan nama pengubah dan tombol Kembalikan (180 hari), log galat dari browser pengguna (dibatasi 30 per 10 menit per akun), dan cadangan unduhan (JSON lengkap atau CSV per tabel).
+- **Google Calendar**: slot biru mengikuti masa berlaku (RRULE UNTIL) dan judulnya menyebut jenis kelas; deskripsi acara menyebut tempat atau "dibahas lewat WhatsApp".
+
 ## Fitur v3 (15 November 2026)
 
 - **Katalog S1 DTSI ITS**: 56 mata kuliah dengan semester (1–8) dan jenis (wajib/pilihan), mengikuti jadwal Gasal 2026/2027. Migrasi: `supabase/migrations/2026-11-15_v3.sql`. Mata kuliah tanpa daftar topik tetap bisa dibooking; topik dibahas bersama mentor.
@@ -144,9 +156,11 @@ npm test            # uji unit
 
 ## Pengujian
 
-- `npm test`: 32 uji unit (slot, ambang nilai, hak mentor, WhatsApp, WIB, dan seluruh alur Google Calendar terhadap API tiruan).
+- `npm test`: 37 uji unit (slot, ambang nilai, hak mentor, WhatsApp, WIB, dan seluruh alur Google Calendar terhadap API tiruan).
 - `e2e/run.mjs`: 34 langkah di browser untuk tiga peran: booking private dan kelas bersama, bergabung ke kelas, upload bukti, konfirmasi admin, kalender induk, mentor batal dengan tombol WA, kredit, pindah jadwal, laporan dan nilai, dasbor IXL, ulasan, hak mentor, undangan, tampilan HP.
 - `e2e/v3.mjs`: 9 langkah untuk fitur v3 (booking tanpa topik, kalender, ruang kerja, link tes, kepadatan, pratinjau warna).
+- `e2e/v4.mjs`: 17 langkah untuk fitur v4 (form jam mentor, label harga di tiap jam, sisa 1 kursi, PENUH tetap tampil, ganti tempat dari kalender, Tabel + CSV, Kelasku, admin hanya melihat jam mentor, Pusat data: kesehatan, ubah lalu kembalikan, log galat, cadangan). Akun uji `e2e-siswa` sampai `e2e-siswa6` terdaftar di OTIN.
+- `e2e/v4api.mjs`: 31 uji API (kelas tertutup dari pola mentor, masa berlaku, admin tidak bisa menulis jam mentor, ganti tempat, fungsi admin tertutup untuk peran lain, riwayat dan pengembalian, batas log galat).
 - `e2e/rls.mjs`: 24 uji keamanan langsung ke API dengan token tiap peran (peserta tidak bisa menandai dirinya lunas, memberi diri kredit, menjadi admin, melihat bukti bayar orang lain, dan seterusnya).
 
 Keduanya butuh akun uji `e2e-admin`, `e2e-mentor`, `e2e-siswa`, `e2e-siswa2` @example.com dengan kata sandi di `E2E_PASSWORD`, dibuat lewat SQL dan dihapus setelah uji (`e2e/cleanup.mjs` untuk file bukti, SQL untuk sisanya). Akun uji tidak ada di database produksi sekarang.
@@ -156,5 +170,6 @@ Catatan advisor keamanan Supabase: peringatan "SECURITY DEFINER function executa
 ## Belum ada
 
 - Nilai Google Form belum mengalir otomatis; mentor mengetik nilai di laporan.
+- Cadangan otomatis terjadwal belum ada; unduh cadangan dari Pusat data secara berkala.
 - Pembayaran manual lewat bukti transfer, belum lewat payment gateway.
 - Perubahan yang dibuat langsung di Google Calendar tidak kembali ke website (kecuali jam sibuk mentor).

@@ -1,7 +1,7 @@
 /**
  * Uji ujung ke ujung IE.Academie v2 di browser sungguhan, terhadap project Supabase.
  * Akun uji: e2e-admin, e2e-mentor, e2e-siswa, e2e-siswa2 (@example.com), kata sandi di E2E_PASSWORD.
- * Mentor uji mengajar STI1 dengan slot 08.00–22.00 tiap hari; kedua peserta terdaftar di STI1.
+ * Mentor uji mengajar STAT1 (Statistika 1) dengan slot 08.00–22.00 tiap hari; kedua peserta terdaftar di STAT1.
  *
  *   node e2e/run.mjs <baseUrl> 1   booking, bayar, konfirmasi, batal oleh mentor, kredit, pindah jadwal
  *   (geser sesi private ke masa lalu lewat SQL, lihat e2e/state.json)
@@ -48,7 +48,7 @@ async function bookFirst(page, { mode, topicIndex, join = false }) {
   await page.goto(base + '/booking');
   await page.getByLabel('Topik yang mau dipelajari').selectOption({ index: topicIndex });
   if (mode === 'group') await page.getByRole('button', { name: /^Kelas bersama ·/ }).click();
-  const slot = page.locator(join ? '.slot.join' : '.slot:not(.join)').first();
+  const slot = page.locator(join ? 'button.slot.join' : 'button.slot:not(.join)').first();
   await slot.waitFor({ timeout: 20000 });
   const label = await slot.innerText();
   await slot.click();
@@ -182,7 +182,7 @@ if (phase === '1') {
     });
     await step('mentor menambah libur dan mengajukan mata kuliah', page, async () => {
       await page.goto(base + '/ketersediaan');
-      await page.getByText('Pola mingguan', { exact: true }).waitFor();
+      await page.getByText('Jam mengajar', { exact: true }).waitFor();
       await page.getByLabel('Keterangan').fill('UAS E2E');
       await page.getByRole('button', { name: 'Tambah libur' }).click();
       await toast(page, /Libur tersimpan/);
@@ -205,7 +205,8 @@ if (phase === '1') {
     });
     await step('peserta 1 pindah jadwal sendiri', page, async () => {
       await page.getByRole('button', { name: 'Pindah jadwal' }).click();
-      await dialog(page).locator('.slot').nth(3).click();
+      await dialog(page).locator('.day-btn').nth(1).click();
+      await dialog(page).locator('button.slot').nth(1).click();
       await dialog(page).getByRole('button', { name: 'Pindahkan' }).click();
       await page.waitForURL((u) => !u.pathname.endsWith(state.credit), { timeout: 15000 });
       state.moved = page.url().match(/sesi\/([0-9a-f-]{36})/)[1];
@@ -233,7 +234,7 @@ if (phase === '2') {
       await toast(page, /Sesi selesai/);
     });
     await step('mentor melihat hak 70%', page, async () => {
-      await page.goto(base + '/hak'); await page.getByText('Rp49.000').first().waitFor(); await shot(page, '13-mentor-hak');
+      await page.goto(base + '/hak'); await page.getByText('Rp52.500').first().waitFor(); await shot(page, '13-mentor-hak');
     });
     await ctx.close();
   }
@@ -309,7 +310,7 @@ if (phase === '2') {
       await dialog(page).getByLabel('Nama lengkap').fill('E2E Undangan');
       await dialog(page).getByLabel(/^Email/).fill('e2e-undangan@example.com');
       await dialog(page).getByLabel('Nomor WhatsApp').fill('081200000009');
-      await dialog(page).getByRole('checkbox', { name: /Statistika Industri 1/ }).check();
+      await dialog(page).getByRole('checkbox', { name: /Statistika 1/ }).check();
       await dialog(page).getByRole('button', { name: 'Kirim undangan' }).click();
       const sent = page.locator('.toast').filter({ hasText: /Undangan terkirim/ });
       const failed = dialog(page).getByText('Email undangan belum bisa dikirim');
@@ -325,7 +326,7 @@ if (phase === '2') {
     });
     await step('admin membuka katalog', page, async () => {
       await page.goto(base + '/katalog');
-      await page.getByRole('button', { name: /STI1 Statistika Industri 1/ }).click();
+      await page.getByRole('button', { name: /STAT1 Statistika 1/ }).click();
       await page.getByLabel(/^Pretest /).first().waitFor();
       await shot(page, '22-admin-katalog');
     });

@@ -28,6 +28,8 @@ const People = lazy(() => import('./views/admin/People'));
 const PersonDetail = lazy(() => import('./views/admin/PersonDetail'));
 const Catalog = lazy(() => import('./views/admin/Catalog'));
 const BusinessSettings = lazy(() => import('./views/admin/BusinessSettings'));
+const DataCenter = lazy(() => import('./views/admin/DataCenter'));
+const Classroom = lazy(() => import('./views/student/Classroom'));
 
 export function App() {
   const status = useStore((r) => r.status);
@@ -89,7 +91,10 @@ export function App() {
         {role !== 'student' && <Route path="/hak" element={<Earnings />} />}
         {role !== 'student' && <Route path="/peserta" element={<People role="student" />} />}
         {role !== 'student' && <Route path="/orang/:id" element={<PersonDetail />} />}
-        {role === 'mentor' && <Route path="/ketersediaan" element={<Availability />} />}
+        {role !== 'student' && <Route path="/ketersediaan" element={<Availability />} />}
+        {role === 'student' && <Route path="/kelas" element={<Classroom />} />}
+        {role === 'student' && <Route path="/kelas/:id" element={<Classroom />} />}
+        {role === 'admin' && <Route path="/data" element={<DataCenter />} />}
         {role === 'admin' && <Route path="/mentor" element={<People role="mentor" />} />}
         {role === 'admin' && <Route path="/kalender" element={<MasterCalendar />} />}
         {role === 'admin' && <Route path="/pembayaran" element={<Payments />} />}

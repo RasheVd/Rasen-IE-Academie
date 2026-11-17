@@ -5,9 +5,11 @@ import { Icon } from '../../components/Icon';
 import { useData } from '../../store';
 import { useTitle } from '../../hooks';
 import { addDays, dayShort, fromLocal, hm, mondayOf, shortDate, toLocal } from '../../domain/time';
-import { MODE_LABEL } from '../../domain/types';
+import { MODE_LABEL, RULE_MODE_LABEL } from '../../domain/types';
+import { ruleValidOn, seatInfo } from '../../domain/slots';
+import { SessionTable } from '../../components/SessionTable';
 
-type Ev = { key: string; kind: 'free' | 'held' | 'booked' | 'done'; min: number; label: string; sub: string; to?: string };
+type Ev = { key: string; kind: 'free' | 'held' | 'booked' | 'done'; min: number; label: string; sub: string; to?: string; seat?: 'warn' | 'bad' };
 
 export default function MasterCalendar() {
   useTitle('Kalender induk');
@@ -16,6 +18,7 @@ export default function MasterCalendar() {
   const [week, setWeek] = useState(mondayOf(today));
   const [course, setCourse] = useState('');
   const [mentor, setMentor] = useState('');
+  const [shape, setShape] = useState<'grid' | 'table'>('grid');
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const mentors = data.profiles.filter((p) => p.role === 'mentor' && p.active && (!mentor || p.id === mentor)
     && (!course || data.mentorCourses.some((m) => m.mentor_id === p.id && m.course_id === course && m.status === 'approved')));
@@ -38,19 +41,20 @@ export default function MasterCalendar() {
       push(l.date, {
         key: s.id, kind: s.status === 'done' ? 'done' : paid ? 'booked' : 'held', min: l.min, to: `/sesi/${s.id}`,
         label: `${c?.code ?? ''} · ${names.join(', ') || 'kosong'}`,
-        sub: `${first(data.profiles.find((p) => p.id === s.mentor_id)?.full_name ?? '')} · ${MODE_LABEL[s.mode]}${s.mode === 'group' ? ` ${seats.length}/5` : ''}${paid ? '' : ' · menunggu bayar'}`,
+        sub: `${first(data.profiles.find((p) => p.id === s.mentor_id)?.full_name ?? '')} · ${MODE_LABEL[s.mode]}${s.mode === 'group' ? ` ${seatInfo(seats.length).text}` : ''}${paid ? '' : ' · menunggu bayar'}`,
+        seat: s.mode === 'group' && seatInfo(seats.length).tone !== 'ok' ? seatInfo(seats.length).tone as 'warn' | 'bad' : undefined,
       });
     }
     for (const m of mentors) {
       for (const date of days) {
         if (data.exceptions.some((e) => e.mentor_id === m.id && date >= e.starts_on && date <= e.ends_on)) continue;
         const wd = toLocal(fromLocal(date, 720)).weekday;
-        for (const r of data.rules.filter((x) => x.mentor_id === m.id && x.active && x.weekday === wd)) {
+        for (const r of data.rules.filter((x) => x.mentor_id === m.id && x.active && x.weekday === wd && ruleValidOn(x, date))) {
           for (let min = r.start_min; min + 60 <= r.end_min; min += 60) {
             const st = fromLocal(date, min).getTime();
             if (sessions.some((s) => s.mentor_id === m.id && Date.parse(s.starts_at) < st + 3_600_000 && Date.parse(s.ends_at) > st)) continue;
             lo = Math.min(lo, Math.floor(min / 60)); hi = Math.max(hi, Math.ceil((min + 60) / 60));
-            push(date, { key: `${m.id}${date}${min}`, kind: 'free', min, label: first(m.full_name), sub: r.modes === 'both' ? 'Private/bersama' : r.modes === 'private' ? 'Private' : 'Bersama' });
+            push(date, { key: `${m.id}${date}${min}`, kind: 'free', min, label: first(m.full_name), sub: `${RULE_MODE_LABEL[r.modes]}${r.modes !== 'private' ? (r.group_open ? ' · terbuka' : ' · tertutup') : ''} · ${r.place_kind === 'diskusi' ? 'tempat via WA' : r.place_kind === 'offline' ? 'tatap muka' : 'online'}` });
           }
         }
       }
@@ -61,7 +65,7 @@ export default function MasterCalendar() {
   return (
     <Shell title="Kalender induk">
       <div className="page-head">
-        <div><h1 className="h-page">Kalender induk</h1><p className="lead">Semua mentor dalam satu minggu. Sama dengan warna di Google Calendar mentor.</p></div>
+        <div><h1 className="h-page">Kalender induk</h1><p className="lead">Semua mentor dalam satu minggu, atau semua sesi dalam satu tabel. Jam diatur mentor; kamu melihat dan memantau.</p></div>
         <div className="row wrap">
           <button className="btn icon" aria-label="Minggu sebelumnya" onClick={() => setWeek(addDays(week, -7))}><Icon name="chevL" /></button>
           <button className="btn" onClick={() => setWeek(mondayOf(today))}>Minggu ini</button>
@@ -78,8 +82,14 @@ export default function MasterCalendar() {
             <option value="">Semua mentor</option>{data.profiles.filter((p) => p.role === 'mentor').map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </select>
         </div>
-        <div className="cal-legend"><span><i className="free" />Tersedia</span><span><i className="held" />Ditahan, menunggu bayar</span><span><i className="booked" />Terbooking</span></div>
+        <div className="row wrap">
+          <div className="cal-legend"><span><i className="free" />Tersedia</span><span><i className="held" />Ditahan, menunggu bayar</span><span><i className="booked" />Terbooking</span><span><i className="warn" />Sisa 1–2 kursi</span><span><i className="full" />Penuh</span></div>
+          <div className="seg sm" role="group" aria-label="Tampilan"><button aria-pressed={shape === 'grid'} onClick={() => setShape('grid')}>Minggu</button><button aria-pressed={shape === 'table'} onClick={() => setShape('table')}>Tabel</button></div>
+        </div>
       </div>
+      {shape === 'table' ? (
+        <div className="card"><SessionTable data={data} who="admin" sessions={data.sessions.filter((s) => (!course || s.course_id === course) && (!mentor || s.mentor_id === mentor))} /></div>
+      ) : <>
       <div className="cal" role="grid" aria-label="Kalender minggu ini">
         <div className="hd" />
         {days.map((d) => <div key={d} className={`hd ${d === today ? 'today' : ''}`} role="columnheader">{dayShort(d)} {Number(d.slice(8))}</div>)}
@@ -90,7 +100,8 @@ export default function MasterCalendar() {
               <div key={d} className="cell" role="gridcell">
                 {(cells.get(`${d}|${h}`) ?? []).sort((a, b) => order(a.kind) - order(b.kind)).map((ev) => {
                   const body = <><b>{ev.label}</b><br />{ev.sub}</>;
-                  return ev.to ? <Link key={ev.key} to={ev.to} className={`ev ${ev.kind}`}>{body}</Link> : <div key={ev.key} className={`ev ${ev.kind}`}>{body}</div>;
+                  const cls = `ev ${ev.kind} ${ev.seat ? `seat-${ev.seat}` : ''}`;
+                  return ev.to ? <Link key={ev.key} to={ev.to} className={cls}>{body}</Link> : <div key={ev.key} className={cls}>{body}</div>;
                 })}
               </div>
             ))}
@@ -98,6 +109,7 @@ export default function MasterCalendar() {
         ))}
       </div>
       {mentors.length === 0 && <p className="muted small">Tidak ada mentor yang cocok dengan filter.</p>}
+      </>}
     </Shell>
   );
 }

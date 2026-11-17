@@ -698,3 +698,107 @@ body.komik .auth-card { border: 2px solid var(--ink-ui); border-radius: 6px; box
 body.komik .auth-card .h-section { font-family: var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: .02em; font-size: 28px; }
 body.komik .loading { background: var(--bg); }
 @media (max-width: 860px) { body.komik .h-page { font-size: 30px; } }
+
+/* ══ v4: slot berlabel, kursi, tabel, Kelasku, Pusat data ══ */
+/* Slot booking: semua jam tampil, yang penuh atau terisi tidak bisa diklik */
+.slot .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 750; margin-top: 2px; }
+.slot.warn { border-color: #e2a336; box-shadow: inset 4px 0 0 #e2a336; }
+.slot.warn .tag { color: #8a5300; }
+.slot.full { background: var(--need-bg); border-color: var(--need-line); color: var(--need-ink); cursor: not-allowed; }
+.slot.full .tag { color: var(--need-ink); text-transform: uppercase; letter-spacing: .03em; }
+.slot.taken, .slot.closed { background: repeating-linear-gradient(135deg, #f4f2ee, #f4f2ee 6px, #ecebe6 6px, #ecebe6 12px); border: 1.5px dashed var(--line-strong); color: var(--muted); cursor: not-allowed; }
+.slot.taken .s, .slot.closed .s { color: var(--muted); }
+.day-btn.none .c { color: var(--faint); }
+.cal-legend i.join { background: #efeafd; border-color: #9b8ce0; }
+.cal-legend i.warn { background: #fff3d6; border-color: #e2a336; }
+.cal-legend i.full { background: var(--need-bg); border-color: #c0392b; }
+.cal-legend i.taken { background: repeating-linear-gradient(135deg, #f4f2ee, #f4f2ee 3px, #e2e0da 3px, #e2e0da 6px); border-color: #a9a69f; }
+
+/* Penanda kursi */
+.seat { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 750; padding: 1px 8px; border-radius: 999px; background: var(--mastered-bg); color: var(--mastered-ink); white-space: nowrap; }
+.seat.warn { background: #fff3d6; color: #8a5300; }
+.seat.bad { background: var(--need-bg); color: var(--need-ink); }
+.gc-ev > * { flex: none; }
+.gc-badge { font-style: normal; font-size: 10px; font-weight: 800; padding: 0 4px; border-radius: 3px; background: rgb(255 255 255 / 92%); color: var(--ink); margin-right: 4px; white-space: nowrap; vertical-align: 1px; }
+.gc-ev.dashed .gc-badge { background: var(--bg); }
+.gc-badge.warn { background: #ffd66b; color: #4a2c00; }
+.gc-badge.bad { background: #fff; color: #b42318; box-shadow: 0 0 0 1.5px #b42318; }
+.gc-chip .gc-badge { margin: 0 0 0 auto; order: 2; }
+.gc-key.warn { background: #ffd66b; }
+.gc-key.full { background: #fff; box-shadow: inset 0 0 0 2px #b42318; }
+.gc-edit summary { cursor: pointer; }
+.gc-edit[open] summary { margin-bottom: 8px; }
+.gc-tablemode { border-radius: var(--r-card); }
+.ev.seat-warn { box-shadow: inset 0 0 0 1.5px #e2a336; }
+.ev.seat-bad { box-shadow: inset 0 0 0 2px #b42318; }
+
+/* Segmen kecil */
+.seg.sm button { padding: 5px 10px; font-size: 13px; }
+
+/* Tabel gaya spreadsheet */
+.sheet-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--line); border-radius: var(--r-card); background: #fff; }
+.sheet { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+.sheet th { position: sticky; top: 0; z-index: 1; background: #f6f5f1; text-align: left; font-size: 12px; font-weight: 750; padding: 8px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+.sheet td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.sheet tbody tr:nth-child(even) td { background: #fbfaf7; }
+.sheet tbody tr:hover td { background: var(--primary-soft); }
+.sheet tr.off td { color: var(--faint); text-decoration: line-through; }
+.sheet .sort { border: 0; background: transparent; font: inherit; font-weight: 750; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; padding: 0; }
+.sheet .clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+
+/* Kelasku */
+.price-note { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; padding: 10px 14px; border-radius: var(--r-card); background: #fff; border: 1px solid var(--line); }
+.price-note b { font-weight: 800; }
+.class-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.class-card { display: grid; gap: 8px; align-content: start; padding: 16px; border-radius: var(--r-card); background: #fff; border: 1px solid var(--line); color: inherit; text-decoration: none; border-top: 5px solid var(--c, var(--accent)); transition: transform .15s ease, box-shadow .15s ease; }
+.class-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 8%); }
+.class-card .code { font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.class-card .today { color: var(--accent); }
+.class-card .go { font-size: 13px; font-weight: 750; display: inline-flex; gap: 4px; align-items: center; color: var(--primary); }
+.today-sess { display: flex; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: #fff; }
+.today-sess .when-col { display: grid; align-content: start; justify-items: center; min-width: 64px; padding: 8px 6px; border-radius: 8px; background: var(--primary); color: #fff; }
+.today-sess .when-col b { font-size: 20px; }
+.test-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.test-box { display: grid; gap: 6px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: 8px; }
+
+/* Pusat data */
+.issue { padding: 14px 16px; border-radius: var(--r-card); border: 1px solid var(--line); background: #fff; display: grid; gap: 8px; border-left: 5px solid var(--line-strong); }
+.issue.bad { border-left-color: #b42318; background: #fff6f5; }
+.issue.warn { border-left-color: #e2a336; background: #fffaf0; }
+.issue.info { border-left-color: #5d8fd0; }
+.issue .chip { text-decoration: none; color: inherit; }
+.list-item.audit { align-items: flex-start; }
+.list-item.restored { opacity: .55; }
+.diff { display: grid; gap: 2px; font-size: 12px; margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.diff b { color: var(--ink); }
+details.err { display: block; }
+details.err summary { cursor: pointer; display: grid; gap: 2px; list-style: none; }
+details.err summary::-webkit-details-marker { display: none; }
+.err-detail { white-space: pre-wrap; word-break: break-word; font-size: 12px; background: #f6f5f1; padding: 10px; border-radius: 6px; max-height: 240px; overflow: auto; }
+.input.ro { background: #f6f5f1; color: var(--muted); display: flex; align-items: center; min-height: 40px; }
+.rule-chip b { font-weight: 800; }
+
+@media (max-width: 700px) {
+  .today-sess { flex-direction: column; }
+  .today-sess .when-col { grid-auto-flow: column; gap: 8px; justify-content: start; }
+}
+
+/* Gaya komik untuk komponen v4 */
+body.komik .class-card { border: 2px solid var(--ink-ui); border-top: 6px solid var(--c, var(--accent)); border-radius: 4px; box-shadow: 4px 4px 0 var(--ink-ui); }
+body.komik .class-card:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink-ui); }
+body.komik .class-card .h-card { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 22px; letter-spacing: .01em; line-height: 1.1; }
+body.komik .price-note { border: 2px solid var(--ink-ui); border-radius: 4px; background: var(--ink-ui); color: #fff; }
+body.komik .price-note .muted { color: #b9b7c1; }
+body.komik .price-note b { color: #fff; box-shadow: inset 0 -.35em 0 color-mix(in srgb, var(--accent) 70%, transparent); }
+body.komik .today-sess { border: 2px solid var(--ink-ui); border-radius: 4px; }
+body.komik .today-sess .when-col { background: var(--ink-ui); border-radius: 2px; box-shadow: 3px 3px 0 var(--accent); }
+body.komik .today-sess .when-col b { font-family: var(--display); font-weight: 400; font-size: 26px; }
+body.komik .test-box { border-radius: 2px; border-color: var(--ink-ui); }
+body.komik .sheet-wrap { border: 2px solid var(--ink-ui); border-radius: 4px; }
+body.komik .sheet th { background: var(--ink-ui); color: #fff; border-bottom: 0; }
+body.komik .sheet .sort { color: #fff; }
+body.komik .issue { border-radius: 4px; }
+body.komik .slot.full { box-shadow: 3px 3px 0 #b42318; }
+body.komik .seat { border-radius: 3px; }
+body.komik .gc-badge.bad { box-shadow: 0 0 0 2px #b42318; }
